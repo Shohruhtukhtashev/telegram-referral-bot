@@ -387,6 +387,42 @@ psql -U bot_user -d telegram_bot -h localhost
 curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo
 ```
 
+### Telegram API Slow Response or Timeout (60s delay)
+If `https://api.telegram.org` is blocked or throttled by your server provider/datacenter (e.g. `ulanish: 0.000000` or 60s timeout in `curl`):
+
+#### Option A: Cloudflare Worker Reverse Proxy (Recommended, Free & Fast)
+1. Go to [dash.cloudflare.com](https://dash.cloudflare.com) -> **Workers & Pages** -> **Create Application** -> **Create Worker**.
+2. Replace code with:
+```javascript
+export default {
+  async fetch(request) {
+    const url = new URL(request.url);
+    url.hostname = 'api.telegram.org';
+    return fetch(new Request(url, request));
+  }
+};
+```
+3. Deploy and copy your worker URL (e.g., `https://my-tg-proxy.subdomain.workers.dev`).
+4. Set environment variable in your service / `.env`:
+```bash
+export TELEGRAM_API_BASE_URL="https://my-tg-proxy.subdomain.workers.dev/bot"
+```
+Or in `application.yml`:
+```yaml
+telegram:
+  api:
+    baseUrl: https://my-tg-proxy.subdomain.workers.dev/bot
+```
+
+#### Option B: SOCKS5 / HTTP Proxy
+If running a local proxy (e.g., SOCKS5 at `127.0.0.1:1080`):
+```bash
+export TELEGRAM_PROXY_ENABLED="true"
+export TELEGRAM_PROXY_TYPE="SOCKS5"
+export TELEGRAM_PROXY_HOST="127.0.0.1"
+export TELEGRAM_PROXY_PORT="1080"
+```
+
 ## Security Checklist
 
 - [ ] Use strong database passwords

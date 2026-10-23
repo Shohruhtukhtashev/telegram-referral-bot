@@ -14,6 +14,8 @@ public class BotConfig {
     private BotProperties bot;
     private BotProperties adminBot;
     private WebhookProperties webhook;
+    private ApiProperties api = new ApiProperties();
+    private ProxyProperties proxy = new ProxyProperties();
 
     @Data
     public static class BotProperties {
@@ -26,6 +28,19 @@ public class BotConfig {
     public static class WebhookProperties {
         private String url;
         private String path = "/webhook";
+    }
+
+    @Data
+    public static class ApiProperties {
+        private String baseUrl = "https://api.telegram.org/bot";
+    }
+
+    @Data
+    public static class ProxyProperties {
+        private boolean enabled = false;
+        private String type = "SOCKS5"; // SOCKS5 or HTTP
+        private String host = "127.0.0.1";
+        private int port = 1080;
     }
 
 }

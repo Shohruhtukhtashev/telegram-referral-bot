@@ -9,6 +9,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
@@ -39,6 +40,7 @@ public class AdminTelegramBot extends TelegramLongPollingBot {
     private final ObjectProvider<ReferralTelegramBot> referralBotProvider;
 
     public AdminTelegramBot(BotConfig botConfig,
+            DefaultBotOptions botOptions,
             TelegramBotUtils botUtils,
             AdminStateManager stateManager,
             AdminNavigationHandler navigationHandler,
@@ -48,7 +50,7 @@ public class AdminTelegramBot extends TelegramLongPollingBot {
             BroadcastHandler broadcastHandler,
             ImageUploadHandler imageUploadHandler,
             ObjectProvider<ReferralTelegramBot> referralBotProvider) {
-        super(botConfig.getAdminBot().getToken());
+        super(botOptions, botConfig.getAdminBot().getToken());
         this.botConfig = botConfig;
         this.botUtils = botUtils;
         this.stateManager = stateManager;

@@ -13,6 +13,7 @@ import com.muzaffar.telegram.util.TelegramBotUtils;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -37,6 +38,7 @@ public class ReferralTelegramBot extends TelegramLongPollingBot {
     private final InlineQueryHandler inlineQueryHandler;
 
     public ReferralTelegramBot(BotConfig botConfig,
+            DefaultBotOptions botOptions,
             TelegramBotUtils botUtils,
             UserSessionService sessionService,
             StartCommandHandler startCommandHandler,
@@ -44,7 +46,7 @@ public class ReferralTelegramBot extends TelegramLongPollingBot {
             ChannelVerificationHandler channelVerificationHandler,
             ReferralHandler referralHandler,
             InlineQueryHandler inlineQueryHandler) {
-        super(botConfig.getBot().getToken());
+        super(botOptions, botConfig.getBot().getToken());
         this.botConfig = botConfig;
         this.botUtils = botUtils;
         this.sessionService = sessionService;
