@@ -114,8 +114,6 @@ public class StartCommandHandler implements BotHandler {
                     sessionService.setPendingReferral(chatId, finalReferralCode);
                 }
 
-                channelVerificationHandler.notifyUserMissingChannels(chatId, missingChannels);
-
                 try {
                     SendMessage channelMessage = channelVerificationHandler
                             .createChallengeChannelSubscriptionMessage(chatId, activeChannels);

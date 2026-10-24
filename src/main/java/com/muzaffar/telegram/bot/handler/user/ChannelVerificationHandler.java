@@ -114,20 +114,8 @@ public class ChannelVerificationHandler {
             String channelWord = (activeChannels.size() > 1) ? "kanallarga" : "kanalga";
             if (callbackQueryId != null) {
                 botUtils.answerCallbackQuery(botSupplier.get(), callbackQueryId,
-                        "❌ Siz hali barcha " + channelWord + " a'zo bo'lmadingiz! Iltimos, barchasiga a'zo bo'ling.", true);
+                        "❌ Iltimos, avval barcha " + channelWord + " obuna bo'ling!", true);
             }
-
-            StringBuilder sb = new StringBuilder();
-            sb.append("Assalomu alaykum\n\n");
-            sb.append("⚠️ *Siz hali quyidagi ").append(channelWord).append(" obuna bo'lmadingiz:*\n\n");
-            for (ChallengeChannel ch : missingChannels) {
-                sb.append("❌ *").append(ch.getChannelName()).append("*\n");
-            }
-            sb.append("\nBotdan to’liq foydalanish uchun barcha ").append(channelWord).append(" obuna bo’ling😊\n\n");
-            sb.append("Keyin \"✅ A'zo bo'ldim\" tugmasini bosing!");
-
-            InlineKeyboardMarkup keyboard = createChallengeChannelSubscriptionKeyboard(activeChannels);
-            botUtils.editMessageWithKeyboard(botSupplier.get(), chatId, messageId, sb.toString(), keyboard);
         }
     }
 
