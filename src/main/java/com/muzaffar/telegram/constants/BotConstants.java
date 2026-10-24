@@ -123,6 +123,7 @@ public final class BotConstants {
      */
     public static final String BUTTON_CANCEL = "❌ Bekor qilish";
 
+
     // ==================== Callback Data Constants ====================
 
     // User Bot Callbacks
@@ -151,6 +152,8 @@ public final class BotConstants {
     public static final String CALLBACK_SETTINGS_SET_PRIVATE_LINK = "settings_set_private_link";
     public static final String CALLBACK_SETTINGS_INFORMATION = "settings_information";
     public static final String CALLBACK_SETTINGS_SET_FORWARD_MESSAGE = "settings_set_forward_message";
+    public static final String CALLBACK_SETTINGS_SET_VIDEO_GUIDE = "settings_set_video_guide";
+    public static final String CALLBACK_SETTINGS_DELETE_VIDEO_GUIDE = "settings_delete_video_guide";
 
     // Admin Bot Callbacks - Information Message
     public static final String CALLBACK_EDIT_INFORMATION_TEXT = "edit_information_text";
@@ -166,6 +169,11 @@ public final class BotConstants {
     public static final String CALLBACK_BROADCAST_INFORMATION_ALL = "broadcast_information_all";
     public static final String CALLBACK_BROADCAST_INFORMATION_ALL_CONFIRM = "broadcast_information_all_confirm";
     public static final String CALLBACK_BROADCAST_INFORMATION_SINGLE = "broadcast_information_single";
+    public static final String CALLBACK_BROADCAST_CUSTOM_ALL = "broadcast_custom_all";
+    public static final String CALLBACK_BROADCAST_CUSTOM_ALL_CONFIRM = "broadcast_custom_all_confirm";
+
+    // Admin Bot Callbacks - Stats
+    public static final String CALLBACK_ADMIN_STATS = "admin_stats_menu";
 
     // Admin Bot Callbacks - Challenge Management
     public static final String CALLBACK_CHALLENGE_MANAGEMENT = "challenge_management";
@@ -189,6 +197,8 @@ public final class BotConstants {
     public static final String STATE_AWAITING_FORWARD_MESSAGE = "AWAITING_FORWARD_MESSAGE";
     public static final String STATE_AWAITING_FORWARD_IMAGE = "AWAITING_FORWARD_IMAGE";
     public static final String STATE_AWAITING_BROADCAST_MESSAGE = "AWAITING_BROADCAST_MESSAGE";
+    public static final String STATE_AWAITING_VIDEO_GUIDE_URL = "AWAITING_VIDEO_GUIDE_URL";
+    public static final String STATE_AWAITING_CUSTOM_BROADCAST_MESSAGE = "AWAITING_CUSTOM_BROADCAST_MESSAGE";
 
     // Challenge Creation States
     public static final String STATE_AWAITING_CHALLENGE_NAME = "AWAITING_CHALLENGE_NAME";

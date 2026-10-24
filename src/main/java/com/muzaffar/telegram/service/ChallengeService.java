@@ -226,6 +226,38 @@ public class ChallengeService {
         
         return new ChallengeStats(totalUsers, completedUsers, totalChannels);
     }
+
+    /**
+     * Update video guide URL for a challenge
+     */
+    @Transactional
+    public void updateVideoGuideUrl(Long challengeId, String videoGuideUrl) {
+        Challenge challenge = challengeRepository.findById(challengeId)
+                .orElseThrow(() -> new IllegalArgumentException("Challenge not found: " + challengeId));
+        challenge.setVideoGuideUrl(videoGuideUrl != null && !videoGuideUrl.trim().isEmpty() ? videoGuideUrl.trim() : null);
+        challengeRepository.save(challenge);
+        log.info("Updated video guide URL for challenge {}: {}", challengeId, videoGuideUrl);
+    }
+
+    /**
+     * Get video guide URL for a challenge (or fall back to default challenge or https://t.me/Bot_uchun_Videoo)
+     */
+    public Optional<String> getVideoGuideUrl(Long challengeId) {
+        if (challengeId != null) {
+            Optional<Challenge> challengeOpt = challengeRepository.findById(challengeId);
+            if (challengeOpt.isPresent() && challengeOpt.get().getVideoGuideUrl() != null 
+                    && !challengeOpt.get().getVideoGuideUrl().trim().isEmpty()) {
+                return Optional.of(challengeOpt.get().getVideoGuideUrl().trim());
+            }
+        }
+        Optional<String> defaultUrl = getDefaultChallenge()
+                .map(Challenge::getVideoGuideUrl)
+                .filter(url -> url != null && !url.trim().isEmpty());
+        if (defaultUrl.isPresent()) {
+            return defaultUrl;
+        }
+        return Optional.of("https://t.me/Bot_uchun_Videoo");
+    }
     
     /**
      * DTO for challenge statistics

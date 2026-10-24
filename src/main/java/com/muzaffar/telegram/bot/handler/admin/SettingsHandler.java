@@ -480,7 +480,84 @@ public class SettingsHandler {
         stateManager.clearMenuMessageId(chatId);
     }
 
+    // ==================== Video Guide URL Settings ====================
+
+    public void startSetVideoGuide(Long chatId, Integer messageId) {
+        Long challengeId = getCurrentChallengeId(chatId);
+        Challenge challenge = challengeService.getChallengeById(challengeId)
+                .orElseThrow(() -> new IllegalArgumentException("Challenge not found"));
+
+        stateManager.setState(chatId, STATE_AWAITING_VIDEO_GUIDE_URL);
+        stateManager.setMenuMessageId(chatId, messageId);
+
+        String currentUrl = challenge.getVideoGuideUrl();
+        boolean hasUrl = currentUrl != null && !currentUrl.trim().isEmpty();
+
+        KeyboardBuilder builder = new KeyboardBuilder();
+        if (hasUrl) {
+            builder.addButton("🗑 Linkni o'chirish", CALLBACK_SETTINGS_DELETE_VIDEO_GUIDE)
+                   .newRow();
+        }
+        builder.addButton("🔙 Orqaga", CALLBACK_MENU_SETTINGS);
+
+        String text = String.format(
+                "📹 *Video qo'llanma havolasini sozlash*\n\n" +
+                "Bu havola yangi foydalanuvchilar /start bosganda xush kelibsiz xabarida ko'rsatiladi.\n\n" +
+                "🔗 *Hozirgi havola:* %s\n\n" +
+                "Yangi kanal/video havolasini yuboring:\n" +
+                "*Masalan:* `https://t.me/Bot_uchun_Videoo`",
+                hasUrl ? "`" + currentUrl + "`" : "_(O'rnatilmagan - default: `https://t.me/Bot_uchun_Videoo`)_");
+
+        editMessage(chatId, messageId, text, builder.build());
+    }
+
+    public void handleVideoGuideUrlInput(Long chatId, String text, Integer messageId) {
+        Long challengeId = getCurrentChallengeId(chatId);
+        String raw = text.trim();
+
+        if (raw.isEmpty()) {
+            InlineKeyboardMarkup keyboard = new KeyboardBuilder()
+                    .addButton("🔙 Orqaga", CALLBACK_MENU_SETTINGS)
+                    .build();
+            sendMessage(chatId, "❌ Havola bo'sh bo'lishi mumkin emas. Qaytadan kiriting:", keyboard);
+            return;
+        }
+
+        // Normalize URL
+        String normalizedUrl = raw;
+        if (!normalizedUrl.startsWith("http://") && !normalizedUrl.startsWith("https://")) {
+            if (normalizedUrl.startsWith("@")) {
+                normalizedUrl = "https://t.me/" + normalizedUrl.substring(1);
+            } else if (normalizedUrl.startsWith("t.me/")) {
+                normalizedUrl = "https://" + normalizedUrl;
+            } else {
+                normalizedUrl = "https://" + normalizedUrl;
+            }
+        }
+
+        botUtils.deleteMessage(botSupplier.get(), chatId, messageId);
+
+        challengeService.updateVideoGuideUrl(challengeId, normalizedUrl);
+
+        sendMessage(chatId,
+                String.format("✅ *Video qo'llanma havolasi saqlandi!*\n\n🔗 Havola: `%s`", normalizedUrl),
+                navigationHandler.createBackButton());
+
+        stateManager.clearState(chatId);
+        stateManager.clearMenuMessageId(chatId);
+    }
+
+    public void confirmDeleteVideoGuide(Long chatId, Integer messageId) {
+        Long challengeId = getCurrentChallengeId(chatId);
+        challengeService.updateVideoGuideUrl(challengeId, null);
+
+        editMessage(chatId, messageId,
+                "✅ *Video qo'llanma havolasi o'chirildi!*\n\nStandart havola ishlatiladi.",
+                navigationHandler.createBackButton());
+    }
+
     private Long getCurrentChallengeId(Long chatId) {
+
         Long challengeId = stateManager.getCurrentChallengeId(chatId);
         if (challengeId != null) {
             return challengeId;

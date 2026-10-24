@@ -387,53 +387,46 @@ psql -U bot_user -d telegram_bot -h localhost
 curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo
 ```
 
-### Telegram API Slow Response or Timeout (60s delay)
-If `https://api.telegram.org` is blocked or throttled by your server provider/datacenter (e.g. `ulanish: 0.000000` or 60s timeout in `curl`):
+---
 
-#### Option A: Cloudflare Worker Reverse Proxy (Recommended, Free & Fast)
-1. Go to [dash.cloudflare.com](https://dash.cloudflare.com) -> **Workers & Pages** -> **Create Application** -> **Create Worker**.
-2. Replace code with:
-```javascript
-export default {
-  async fetch(request) {
-    const url = new URL(request.url);
-    url.hostname = 'api.telegram.org';
-    return fetch(new Request(url, request));
-  }
-};
-```
-3. Deploy and copy your worker URL (e.g., `https://my-tg-proxy.subdomain.workers.dev`).
-4. Set environment variable in your service / `.env`:
-```bash
-export TELEGRAM_API_BASE_URL="https://my-tg-proxy.subdomain.workers.dev/bot"
-```
-Or in `application.yml`:
-```yaml
-telegram:
-  api:
-    baseUrl: https://my-tg-proxy.subdomain.workers.dev/bot
-```
+## Deploy to Railway (Tavsiya etiladi)
 
-#### Option B: SOCKS5 / HTTP Proxy
-If running a local proxy (e.g., SOCKS5 at `127.0.0.1:1080`):
-```bash
-export TELEGRAM_PROXY_ENABLED="true"
-export TELEGRAM_PROXY_TYPE="SOCKS5"
-export TELEGRAM_PROXY_HOST="127.0.0.1"
-export TELEGRAM_PROXY_PORT="1080"
-```
+Railway platformasida loyihani 3 daqiqada ishga tushirish:
+
+### 1. GitHub repozitoriyasini ulash
+1. [railway.app](https://railway.app) ga kiring va GitHub profilingiz orqali tizimga kiring.
+2. **"New Project"** -> **"Deploy from GitHub repo"** tugmasini bosing va ushbu repozitoriyani tanlang.
+
+### 2. PostgreSQL ma'lumotlar bazasini qo'shish
+1. Loyiha oynasida **"+ New"** -> **"Database"** -> **"Add PostgreSQL"** ni bosing.
+2. Railway avtomatik ravishda `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` o'zgaruvchilarini taqdim etadi. Loyiha `application.yml` fayli ushbu o'zgaruvchilarni avtomatik taniydi!
+
+### 3. Environment Variables (Muhit o'zgaruvchilari)ni sozlash
+Bot xizmati (**Variables** bo'limi)ga quyidagi o'zgaruvchilarni qo'shing:
+
+| O'zgaruvchi nomi | Tavsif | Misol |
+| :--- | :--- | :--- |
+| `TELEGRAM_BOT_TOKEN` | Asosiy User bot tokeni | `123456789:ABCdef...` |
+| `TELEGRAM_BOT_USERNAME` | Asosiy bot username (@ siz) | `my_referral_bot` |
+| `TELEGRAM_ADMIN_BOT_TOKEN` | Admin bot tokeni | `987654321:XYZabc...` |
+| `TELEGRAM_ADMIN_BOT_USERNAME` | Admin bot username (@ siz) | `my_admin_bot` |
+| `ADMIN_CHAT_IDS` | Adminlarning Telegram chat ID lari | `698738577,657778959` |
+| `BOT_IMAGES_BASE_PATH` | Rasmlar saqlanadigan yo'l | `/app/data/images` |
+| `INVITE_LINK_EXPIRE_HOURS` | Taklif havolasi amal qilish muddati | `24` |
+| `INVITE_LINK_MEMBER_LIMIT` | Taklif havolasi odam soni limiti | `1` |
+
+> **Eslatma:** Railway PostgreSQL bilan bog'lanish avtomatik amalga oshadi, qo'shimcha DB URL kiritish shart emas.
+
+---
 
 ## Security Checklist
 
 - [ ] Use strong database passwords
-- [ ] Enable firewall (UFW/firewalld)
-- [ ] Use HTTPS for webhook mode
 - [ ] Keep Java and dependencies updated
 - [ ] Store tokens in environment variables
 - [ ] Regularly backup database
 - [ ] Monitor application logs
 - [ ] Limit admin access
-- [ ] Use fail2ban for SSH protection
 
 ---
 

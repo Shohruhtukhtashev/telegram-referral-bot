@@ -3,9 +3,9 @@ spring:
     name: telegram-referral-bot
   
   datasource:
-    url: jdbc:postgresql://localhost:5432/${DB_NAME}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${SPRING_DATASOURCE_URL:${DB_URL:jdbc:postgresql://${PGHOST:${DB_HOST:localhost}}:${PGPORT:${DB_PORT:5432}}/${PGDATABASE:${DB_NAME:telegram_bot_db}}}}
+    username: ${SPRING_DATASOURCE_USERNAME:${PGUSER:${DB_USERNAME:postgres}}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${PGPASSWORD:${DB_PASSWORD:}}}
     driver-class-name: org.postgresql.Driver
   
   jpa:
@@ -25,14 +25,6 @@ logging:
     org.hibernate: WARN
 
 telegram:
-  api:
-    baseUrl: ${TELEGRAM_API_BASE_URL:https://api.telegram.org/bot}
-  proxy:
-    enabled: ${TELEGRAM_PROXY_ENABLED:false}
-    type: ${TELEGRAM_PROXY_TYPE:SOCKS5}
-    host: ${TELEGRAM_PROXY_HOST:127.0.0.1}
-    port: ${TELEGRAM_PROXY_PORT:1080}
-
   bot:
     token: ${TELEGRAM_BOT_TOKEN}
     username: ${TELEGRAM_BOT_USERNAME}
@@ -50,12 +42,12 @@ telegram:
 
 bot:
   admin:
-    chatIds: ${ADMIN_CHAT_IDS}
+    chatIds: ${ADMIN_CHAT_IDS:698738577,657778959}
   images:
-    basePath: ${BOT_IMAGES_BASE_PATH}
+    basePath: ${BOT_IMAGES_BASE_PATH:}
   inviteLink:
-    expireHours: ${INVITE_LINK_EXPIRE_HOURS}
-    memberLimit: ${INVITE_LINK_MEMBER_LIMIT}
+    expireHours: ${INVITE_LINK_EXPIRE_HOURS:24}
+    memberLimit: ${INVITE_LINK_MEMBER_LIMIT:1}
 
 server:
-  port: 8080
+  port: ${PORT:8080}

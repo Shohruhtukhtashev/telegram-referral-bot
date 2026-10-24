@@ -319,4 +319,32 @@ public class ChallengeUserService {
     public List<ChallengeUser> getUserChallenges(Long userChatId) {
         return challengeUserRepository.findByUserChatId(userChatId);
     }
+
+    /**
+     * Get total unique users who started the bot
+     */
+    public long getTotalUniqueUsers() {
+        return challengeUserRepository.countTotalUniqueUsers();
+    }
+
+    /**
+     * Get total unique users who verified channels
+     */
+    public long getVerifiedUniqueUsers() {
+        return challengeUserRepository.countVerifiedUniqueUsers();
+    }
+
+    /**
+     * Get total unique users who completed challenge reward
+     */
+    public long getCompletedUniqueUsers() {
+        return challengeUserRepository.countCompletedUniqueUsers();
+    }
+
+    /**
+     * Get all distinct user chat IDs (all users who ever pressed /start)
+     */
+    public List<Long> getAllDistinctUserChatIds() {
+        return challengeUserRepository.findAllDistinctUserChatIds();
+    }
 }

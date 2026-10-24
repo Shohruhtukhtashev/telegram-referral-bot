@@ -13,7 +13,6 @@ import com.muzaffar.telegram.util.TelegramBotUtils;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -38,7 +37,6 @@ public class ReferralTelegramBot extends TelegramLongPollingBot {
     private final InlineQueryHandler inlineQueryHandler;
 
     public ReferralTelegramBot(BotConfig botConfig,
-            DefaultBotOptions botOptions,
             TelegramBotUtils botUtils,
             UserSessionService sessionService,
             StartCommandHandler startCommandHandler,
@@ -46,7 +44,7 @@ public class ReferralTelegramBot extends TelegramLongPollingBot {
             ChannelVerificationHandler channelVerificationHandler,
             ReferralHandler referralHandler,
             InlineQueryHandler inlineQueryHandler) {
-        super(botOptions, botConfig.getBot().getToken());
+        super(botConfig.getBot().getToken());
         this.botConfig = botConfig;
         this.botUtils = botUtils;
         this.sessionService = sessionService;
@@ -70,6 +68,15 @@ public class ReferralTelegramBot extends TelegramLongPollingBot {
     @Override
     public String getBotUsername() {
         return botConfig.getBot().getUsername();
+    }
+
+    @Override
+    public void clearWebhook() throws org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException {
+        try {
+            super.clearWebhook();
+        } catch (Exception e) {
+            log.warn("⚠️ Could not clear webhook for User bot, proceeding anyway: {}", e.getMessage());
+        }
     }
 
     /**

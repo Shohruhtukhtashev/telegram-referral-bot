@@ -138,6 +138,7 @@ public class StartCommandHandler implements BotHandler {
             // Show channel subscription request (from challenge's channels)
             if (!activeChannels.isEmpty()) {
                 try {
+                    sendWelcomeGuideMessage(chatId, firstName, finalChallenge);
                     SendMessage channelMessage = channelVerificationHandler
                             .createChallengeChannelSubscriptionMessage(chatId, activeChannels);
                     botSupplier.get().execute(channelMessage);
@@ -192,6 +193,7 @@ public class StartCommandHandler implements BotHandler {
         List<ChallengeChannel> activeChannels = challengeService.getActiveChannelsForChallenge(finalChallenge.getId());
         if (!activeChannels.isEmpty()) {
             try {
+                sendWelcomeGuideMessage(chatId, firstName, finalChallenge);
                 SendMessage channelMessage = channelVerificationHandler
                         .createChallengeChannelSubscriptionMessage(chatId, activeChannels);
                 botSupplier.get().execute(channelMessage);
@@ -377,4 +379,33 @@ public class StartCommandHandler implements BotHandler {
         }
         return mainChallenge;
     }
+
+    /**
+     * Send welcome message with video guide link:
+     * 🌟 Botga xush kelibsiz, {name}!
+     * [Botdan foydalanish uchun video qo'llanma]({link})
+     */
+    private void sendWelcomeGuideMessage(Long chatId, String firstName, Challenge challenge) {
+        String name = (firstName != null && !firstName.trim().isEmpty()) ? firstName.trim() : "qadrli foydalanuvchi";
+        name = name.replace("*", "").replace("_", "").replace("[", "").replace("`", "");
+
+        String guideUrl = challengeService.getVideoGuideUrl(challenge != null ? challenge.getId() : null)
+                .orElse("https://t.me/Bot_uchun_Videoo");
+
+        String text = String.format("🌟 Botga xush kelibsiz, %s!\n\n[Botdan foydalanish uchun video qo'llanma](%s)",
+                name, guideUrl);
+
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId.toString());
+        message.setText(text);
+        message.setParseMode("Markdown");
+        message.setDisableWebPagePreview(true);
+
+        try {
+            botSupplier.get().execute(message);
+        } catch (TelegramApiException e) {
+            log.error("Error sending welcome guide message to chatId={}", chatId, e);
+        }
+    }
 }
+

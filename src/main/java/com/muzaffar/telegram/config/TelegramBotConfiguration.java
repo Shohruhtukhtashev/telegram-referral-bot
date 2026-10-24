@@ -24,20 +24,27 @@ public class TelegramBotConfiguration {
         try {
             TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
 
-            botsApi.registerBot(telegramBot);
-            log.info("✅ User bot registered successfully with LONG POLLING mode");
-            log.info("User bot username: @{}", telegramBot.getBotUsername());
+            try {
+                botsApi.registerBot(telegramBot);
+                log.info("✅ User bot registered successfully with LONG POLLING mode");
+                log.info("User bot username: @{}", telegramBot.getBotUsername());
+            } catch (Exception e) {
+                log.error("❌ Failed to register User bot", e);
+            }
 
             if (adminBot.getBotToken() != null && !adminBot.getBotToken().isEmpty()) {
-                botsApi.registerBot(adminBot);
-                log.info("✅ Admin bot registered successfully with LONG POLLING mode");
-                log.info("Admin bot username: @{}", adminBot.getBotUsername());
+                try {
+                    botsApi.registerBot(adminBot);
+                    log.info("✅ Admin bot registered successfully with LONG POLLING mode");
+                    log.info("Admin bot username: @{}", adminBot.getBotUsername());
+                } catch (Exception e) {
+                    log.error("⚠️ Failed to register Admin bot: {}", e.getMessage());
+                }
             } else {
                 log.warn("⚠️ Admin bot token not configured, skipping admin bot registration");
             }
-        } catch (TelegramApiException e) {
-            log.error("❌ Failed to register Telegram bots", e);
-            throw new RuntimeException("Failed to initialize Telegram bots", e);
+        } catch (Exception e) {
+            log.error("❌ Failed to initialize TelegramBotsApi", e);
         }
     }
 }

@@ -17,6 +17,11 @@ import java.util.Map;
 import java.util.Stack;
 import java.util.function.Supplier;
 
+import com.muzaffar.telegram.entity.Challenge;
+import com.muzaffar.telegram.service.ChallengeService;
+import com.muzaffar.telegram.service.ChallengeUserService;
+import java.util.List;
+
 /**
  * Handles navigation and menu management for admin bot.
  * Manages back button navigation and menu display.
@@ -27,6 +32,8 @@ import java.util.function.Supplier;
 public class AdminNavigationHandler {
 
     private final AdminStateManager stateManager;
+    private final ChallengeUserService challengeUserService;
+    private final ChallengeService challengeService;
 
     private final Map<Long, Stack<String>> navigationHistory = new HashMap<>();
     private Supplier<TelegramLongPollingBot> botSupplier;
@@ -72,20 +79,45 @@ public class AdminNavigationHandler {
     // ==================== Menu Display ====================
 
     /**
+     * Build the text for challenge management / admin dashboard
+     */
+    private String buildDashboardText() {
+        long totalUsers = challengeUserService.getTotalUniqueUsers();
+        long verifiedUsers = challengeUserService.getVerifiedUniqueUsers();
+        long completedUsers = challengeUserService.getCompletedUniqueUsers();
+
+        return String.format(
+                "📊 *Admin boshqaruv paneli*\n\n" +
+                "👥 *Botdagi jami obunachilar:* %d ta\n" +
+                "✅ *Obunani tasdiqlaganlar:* %d ta\n" +
+                "🎯 *Mukofot olganlar:* %d ta\n\n" +
+                "Kerakli amalni tanlang:",
+                totalUsers, verifiedUsers, completedUsers);
+    }
+
+    /**
+     * Build the keyboard for challenge management / admin dashboard
+     */
+    private InlineKeyboardMarkup buildDashboardKeyboard() {
+        return new KeyboardBuilder()
+                .addButton("➕ Yangi challenge", CALLBACK_CHALLENGE_CREATE)
+                .addButton("📋 Challengelar", CALLBACK_CHALLENGE_LIST)
+                .newRow()
+                .addButton("📢 Barchaga xabar yuborish", CALLBACK_BROADCAST_CUSTOM_ALL)
+                .newRow()
+                .addButton("📊 To'liq statistika", CALLBACK_ADMIN_STATS)
+                .build();
+    }
+
+    /**
      * Show challenge management menu (new message)
      */
     public void showChallengeManagementMenu(Long chatId) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
-        message.setText("📊 *Challengelar boshqaruvi*\n\nKerakli amalni tanlang:");
+        message.setText(buildDashboardText());
         message.setParseMode("Markdown");
-
-        InlineKeyboardMarkup keyboard = new KeyboardBuilder()
-                .addButton("➕ Yangi challenge yaratish", CALLBACK_CHALLENGE_CREATE)
-                .newRow()
-                .addButton("📋 Challengelar ro'yxati", CALLBACK_CHALLENGE_LIST)
-                .build();
-        message.setReplyMarkup(keyboard);
+        message.setReplyMarkup(buildDashboardKeyboard());
 
         try {
             botSupplier.get().execute(message);
@@ -101,15 +133,9 @@ public class AdminNavigationHandler {
         EditMessageText message = new EditMessageText();
         message.setChatId(chatId.toString());
         message.setMessageId(messageId);
-        message.setText("📊 *Challengelar boshqaruvi*\n\nKerakli amalni tanlang:");
+        message.setText(buildDashboardText());
         message.setParseMode("Markdown");
-
-        InlineKeyboardMarkup keyboard = new KeyboardBuilder()
-                .addButton("➕ Yangi challenge yaratish", CALLBACK_CHALLENGE_CREATE)
-                .newRow()
-                .addButton("📋 Challengelar ro'yxati", CALLBACK_CHALLENGE_LIST)
-                .build();
-        message.setReplyMarkup(keyboard);
+        message.setReplyMarkup(buildDashboardKeyboard());
 
         try {
             botSupplier.get().execute(message);
@@ -169,6 +195,8 @@ public class AdminNavigationHandler {
                 .newRow()
                 .addButton("🔗 Shaxsiy kanal ID o'zgartirish", CALLBACK_SETTINGS_SET_PRIVATE_LINK)
                 .newRow()
+                .addButton("📹 Video qo'llanma linki", CALLBACK_SETTINGS_SET_VIDEO_GUIDE)
+                .newRow()
                 .addButton("📝 Information xabarini o'zgartirish", CALLBACK_SETTINGS_INFORMATION)
                 .newRow()
                 .addButton("📤 Forward xabarini o'zgartirish", CALLBACK_SETTINGS_SET_FORWARD_MESSAGE)
@@ -193,12 +221,13 @@ public class AdminNavigationHandler {
         message.setMessageId(messageId);
         message.setText(
                 "📢 *Xabar yuborish*\n\n" +
-                        "Information xabarini foydalanuvchilarga yuborish:\n\n" +
                         "Quyidagi variantlardan birini tanlang:");
         message.setParseMode("Markdown");
 
         InlineKeyboardMarkup keyboard = new KeyboardBuilder()
-                .addButton("📤 Barcha foydalanuvchilarga", CALLBACK_BROADCAST_INFORMATION_ALL)
+                .addButton("📢 Barchaga yangi xabar yuborish", CALLBACK_BROADCAST_CUSTOM_ALL)
+                .newRow()
+                .addButton("📝 Information xabarini barchaga", CALLBACK_BROADCAST_INFORMATION_ALL)
                 .newRow()
                 .addButton("👥 Tanlangan foydalanuvchilarga", CALLBACK_BROADCAST_INFORMATION_SINGLE)
                 .newRow()
@@ -210,6 +239,65 @@ public class AdminNavigationHandler {
             botSupplier.get().execute(message);
         } catch (TelegramApiException e) {
             log.error("Error showing broadcast menu", e);
+        }
+    }
+
+    /**
+     * Show full admin statistics
+     */
+    public void showFullAdminStats(Long chatId, Integer messageId) {
+        long totalUsers = challengeUserService.getTotalUniqueUsers();
+        long verifiedUsers = challengeUserService.getVerifiedUniqueUsers();
+        long completedUsers = challengeUserService.getCompletedUniqueUsers();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("📊 *Bot to'liq statistikasi*\n\n");
+        sb.append(String.format("👥 *Jami obunachilar (start bosganlar):* %d ta\n", totalUsers));
+        sb.append(String.format("✅ *Kanallarga obuna bo'lganlar:* %d ta\n", verifiedUsers));
+        sb.append(String.format("🎯 *Vazifani bajarganlar (mukofot olganlar):* %d ta\n\n", completedUsers));
+
+        List<Challenge> challenges = challengeService.getAllChallenges();
+        if (!challenges.isEmpty()) {
+            sb.append("🏆 *Challengelar bo'yicha ko'rsatkichlar:*\n\n");
+            for (Challenge ch : challenges) {
+                ChallengeService.ChallengeStats stats = challengeService.getChallengeStats(ch.getId());
+                String mainLabel = ch.getIsMain() ? " ⭐" : "";
+                String activeLabel = ch.getIsActive() ? "✅ Faol" : "❌ Faol emas";
+
+                sb.append(String.format("• *%s*%s (%s):\n", ch.getName(), mainLabel, activeLabel));
+                sb.append(String.format("   Ishtirokchilar: %d ta\n", stats.totalUsers()));
+                sb.append(String.format("   Bajarganlar: %d ta\n", stats.completedUsers()));
+                sb.append(String.format("   Kerakli referallar: %d ta\n\n", ch.getRequiredReferralCount()));
+            }
+        }
+
+        InlineKeyboardMarkup keyboard = new KeyboardBuilder()
+                .addButton("🔙 Asosiy menyu", CALLBACK_MAIN_MENU)
+                .build();
+
+        if (messageId != null) {
+            EditMessageText edit = new EditMessageText();
+            edit.setChatId(chatId.toString());
+            edit.setMessageId(messageId);
+            edit.setText(sb.toString());
+            edit.setParseMode("Markdown");
+            edit.setReplyMarkup(keyboard);
+            try {
+                botSupplier.get().execute(edit);
+            } catch (TelegramApiException e) {
+                log.error("Error editing full stats message", e);
+            }
+        } else {
+            SendMessage msg = new SendMessage();
+            msg.setChatId(chatId.toString());
+            msg.setText(sb.toString());
+            msg.setParseMode("Markdown");
+            msg.setReplyMarkup(keyboard);
+            try {
+                botSupplier.get().execute(msg);
+            } catch (TelegramApiException e) {
+                log.error("Error sending full stats message", e);
+            }
         }
     }
 

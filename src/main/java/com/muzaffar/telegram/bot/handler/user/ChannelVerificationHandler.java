@@ -122,10 +122,13 @@ public class ChannelVerificationHandler {
         message.setParseMode("Markdown");
         message.setDisableWebPagePreview(true);
 
+        String channelWord = (channels != null && channels.size() > 1) ? "kanallarga" : "kanalga";
         StringBuilder text = new StringBuilder();
-        text.append("📺 *Quyidagi kanallarga a'zo bo'ling:*\n\n");
-        text.append("Keyin \"✅ A'zo bo'ldim\" tugmasini bosing!");
+        text.append("Assalomu alaykum\n\n");
+        text.append("Botdan to’liq foydalanish uchun quyidagi ").append(channelWord).append(" obuna bo’ling😊\n\n");
+        text.append("Keyin \"✅ A'zo bo'ldim \" tugmasini bosing!");
         message.setText(text.toString());
+
 
         // Create keyboard with channel buttons + verify button
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
@@ -136,10 +139,17 @@ public class ChannelVerificationHandler {
             List<InlineKeyboardButton> row = new ArrayList<>();
             InlineKeyboardButton channelButton = new InlineKeyboardButton();
             channelButton.setText(channel.getChannelName());
-            channelButton.setUrl("https://t.me/" + channel.getChannelUsername());
+            String rawUsername = channel.getChannelUsername() != null ? channel.getChannelUsername().trim() : "";
+            if (rawUsername.startsWith("http://") || rawUsername.startsWith("https://")) {
+                channelButton.setUrl(rawUsername);
+            } else {
+                channelButton.setUrl("https://t.me/" + rawUsername.replace("@", ""));
+            }
             row.add(channelButton);
             rows.add(row);
         }
+
+
 
         // Add verify button at the bottom
         List<InlineKeyboardButton> verifyRow = new ArrayList<>();
@@ -166,7 +176,14 @@ public class ChannelVerificationHandler {
         // If failed and we have a username, try with @username format
         if (chatMember == null && channel.getChannelUsername() != null && !channel.getChannelUsername().isEmpty()) {
             log.info("Retrying with @username format for channel: {}", channel.getChannelName());
-            String usernameFormat = "@" + channel.getChannelUsername().replace("@", "");
+            String raw = channel.getChannelUsername().trim();
+            String cleanUser;
+            if (raw.startsWith("http://") || raw.startsWith("https://")) {
+                cleanUser = raw.substring(raw.lastIndexOf('/') + 1).replace("@", "");
+            } else {
+                cleanUser = raw.replace("@", "");
+            }
+            String usernameFormat = "@" + cleanUser;
             chatMember = tryGetChatMember(userId, usernameFormat);
         }
 

@@ -35,4 +35,16 @@ public interface ChallengeUserRepository extends JpaRepository<ChallengeUser, Lo
     boolean existsByChallengeAndUserChatId(Challenge challenge, Long userChatId);
 
     List<ChallengeUser> findByUserChatId(Long userChatId);
+
+    @Query("SELECT COUNT(DISTINCT cu.userChatId) FROM ChallengeUser cu")
+    long countTotalUniqueUsers();
+
+    @Query("SELECT COUNT(DISTINCT cu.userChatId) FROM ChallengeUser cu WHERE cu.hasVerifiedChannels = true")
+    long countVerifiedUniqueUsers();
+
+    @Query("SELECT COUNT(DISTINCT cu.userChatId) FROM ChallengeUser cu WHERE cu.isCompleted = true")
+    long countCompletedUniqueUsers();
+
+    @Query("SELECT DISTINCT cu.userChatId FROM ChallengeUser cu")
+    List<Long> findAllDistinctUserChatIds();
 }

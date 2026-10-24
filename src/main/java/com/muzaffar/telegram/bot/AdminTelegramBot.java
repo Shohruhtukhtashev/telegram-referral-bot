@@ -9,7 +9,6 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
@@ -40,7 +39,6 @@ public class AdminTelegramBot extends TelegramLongPollingBot {
     private final ObjectProvider<ReferralTelegramBot> referralBotProvider;
 
     public AdminTelegramBot(BotConfig botConfig,
-            DefaultBotOptions botOptions,
             TelegramBotUtils botUtils,
             AdminStateManager stateManager,
             AdminNavigationHandler navigationHandler,
@@ -50,7 +48,7 @@ public class AdminTelegramBot extends TelegramLongPollingBot {
             BroadcastHandler broadcastHandler,
             ImageUploadHandler imageUploadHandler,
             ObjectProvider<ReferralTelegramBot> referralBotProvider) {
-        super(botOptions, botConfig.getAdminBot().getToken());
+        super(botConfig.getAdminBot().getToken());
         this.botConfig = botConfig;
         this.botUtils = botUtils;
         this.stateManager = stateManager;
@@ -80,6 +78,15 @@ public class AdminTelegramBot extends TelegramLongPollingBot {
     }
 
     @Override
+    public void clearWebhook() throws org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException {
+        try {
+            super.clearWebhook();
+        } catch (Exception e) {
+            log.warn("⚠️ Could not clear webhook for Admin bot, proceeding anyway: {}", e.getMessage());
+        }
+    }
+
+    @Override
     public void onUpdateReceived(Update update) {
         try {
             if (update.hasMessage()) {
@@ -94,7 +101,11 @@ public class AdminTelegramBot extends TelegramLongPollingBot {
                 if (message.hasText()) {
                     handleTextMessage(chatId, message);
                 } else if (message.hasPhoto()) {
-                    imageUploadHandler.handlePhotoUpload(chatId, message);
+                    if (STATE_AWAITING_CUSTOM_BROADCAST_MESSAGE.equals(stateManager.getState(chatId))) {
+                        broadcastHandler.handleCustomBroadcastPhotoInput(chatId, message);
+                    } else {
+                        imageUploadHandler.handlePhotoUpload(chatId, message);
+                    }
                 } else if (message.hasDocument()) {
                     imageUploadHandler.handleDocumentUpload(chatId, message);
                 }
@@ -125,6 +136,16 @@ public class AdminTelegramBot extends TelegramLongPollingBot {
 
         if (text.equals(START_COMMAND) || text.equals(MENU_COMMAND)) {
             navigationHandler.showChallengeManagementMenu(chatId);
+        } else if (text.equals(STATS_COMMAND) || text.equals(ADMIN_STATS_COMMAND)) {
+            navigationHandler.showFullAdminStats(chatId, null);
+        } else if (text.startsWith(ADMIN_BROADCAST_COMMAND)) {
+            String broadcastContent = text.length() > ADMIN_BROADCAST_PREFIX_LENGTH
+                    ? text.substring(ADMIN_BROADCAST_PREFIX_LENGTH).trim() : "";
+            if (!broadcastContent.isEmpty()) {
+                broadcastHandler.handleCustomBroadcastTextInput(chatId, broadcastContent, message.getMessageId());
+            } else {
+                broadcastHandler.startBroadcastCustomAll(chatId, null);
+            }
         } else {
             handleTextInput(chatId, text, message.getMessageId());
         }
@@ -176,6 +197,12 @@ public class AdminTelegramBot extends TelegramLongPollingBot {
             case STATE_AWAITING_BROADCAST_MESSAGE:
                 broadcastHandler.handleBroadcastUserIdInput(chatId, text, messageId);
                 break;
+            case STATE_AWAITING_VIDEO_GUIDE_URL:
+                settingsHandler.handleVideoGuideUrlInput(chatId, text, messageId);
+                break;
+            case STATE_AWAITING_CUSTOM_BROADCAST_MESSAGE:
+                broadcastHandler.handleCustomBroadcastTextInput(chatId, text, messageId);
+                break;
             default:
                 log.warn("Unknown state for chatId={}: {}", chatId, state);
                 stateManager.clearAll(chatId);
@@ -199,6 +226,10 @@ public class AdminTelegramBot extends TelegramLongPollingBot {
             case CALLBACK_MAIN_MENU:
             case CALLBACK_CHALLENGE_MANAGEMENT:
                 navigationHandler.showChallengeManagementMenu(chatId, messageId);
+                break;
+            case CALLBACK_ADMIN_STATS:
+                navigationHandler.pushNavigation(chatId, CALLBACK_MAIN_MENU);
+                navigationHandler.showFullAdminStats(chatId, messageId);
                 break;
             case CALLBACK_BACK:
                 handleBackButton(chatId, messageId);
@@ -251,6 +282,13 @@ public class AdminTelegramBot extends TelegramLongPollingBot {
                 navigationHandler.pushNavigation(chatId, CALLBACK_MENU_SETTINGS);
                 settingsHandler.startSetPrivateLink(chatId, messageId);
                 break;
+            case CALLBACK_SETTINGS_SET_VIDEO_GUIDE:
+                navigationHandler.pushNavigation(chatId, CALLBACK_MENU_SETTINGS);
+                settingsHandler.startSetVideoGuide(chatId, messageId);
+                break;
+            case CALLBACK_SETTINGS_DELETE_VIDEO_GUIDE:
+                settingsHandler.confirmDeleteVideoGuide(chatId, messageId);
+                break;
             case CALLBACK_SETTINGS_INFORMATION:
                 navigationHandler.pushNavigation(chatId, CALLBACK_MENU_SETTINGS);
                 settingsHandler.startSetInformationMessage(chatId, messageId);
@@ -282,6 +320,13 @@ public class AdminTelegramBot extends TelegramLongPollingBot {
             case CALLBACK_MENU_BROADCAST:
                 navigationHandler.pushNavigation(chatId, CALLBACK_CHALLENGE_LIST);
                 navigationHandler.showBroadcastMenu(chatId, messageId);
+                break;
+            case CALLBACK_BROADCAST_CUSTOM_ALL:
+                navigationHandler.pushNavigation(chatId, CALLBACK_MAIN_MENU);
+                broadcastHandler.startBroadcastCustomAll(chatId, messageId);
+                break;
+            case CALLBACK_BROADCAST_CUSTOM_ALL_CONFIRM:
+                broadcastHandler.executeBroadcastCustomAll(chatId, messageId);
                 break;
             case CALLBACK_BROADCAST_INFORMATION_ALL:
                 navigationHandler.pushNavigation(chatId, CALLBACK_MENU_BROADCAST);
@@ -326,6 +371,7 @@ public class AdminTelegramBot extends TelegramLongPollingBot {
 
         switch (previousCallback) {
             case CALLBACK_CHALLENGE_MANAGEMENT:
+            case CALLBACK_MAIN_MENU:
                 navigationHandler.showChallengeManagementMenu(chatId, messageId);
                 break;
             case CALLBACK_CHALLENGE_LIST:

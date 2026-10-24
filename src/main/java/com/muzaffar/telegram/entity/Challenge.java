@@ -33,6 +33,9 @@ public class Challenge {
     @Column(length = 100)
     private String privateChannelId;  // Channel ID for creating invite links (e.g., -1001234567890)
     
+    @Column(length = 500)
+    private String videoGuideUrl;  // Channel link containing video guide
+    
     @Column(nullable = false)
     @Builder.Default
     private Boolean isActive = true;

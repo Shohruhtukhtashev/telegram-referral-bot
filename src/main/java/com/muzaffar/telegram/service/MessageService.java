@@ -20,6 +20,7 @@ import java.util.List;
 public class MessageService {
 
     private final MessageTemplateService messageTemplateService;
+    private final ChallengeService challengeService;
     private final com.muzaffar.telegram.util.TelegramBotUtils botUtils;
 
     /**
@@ -320,12 +321,18 @@ public class MessageService {
         for (com.muzaffar.telegram.entity.ChallengeChannel channel : channels) {
             InlineKeyboardButton channelButton = new InlineKeyboardButton();
             channelButton.setText(channel.getChannelName());
-            channelButton.setUrl("https://t.me/" + channel.getChannelUsername());
+            String rawUsername = channel.getChannelUsername() != null ? channel.getChannelUsername().trim() : "";
+            if (rawUsername.startsWith("http://") || rawUsername.startsWith("https://")) {
+                channelButton.setUrl(rawUsername);
+            } else {
+                channelButton.setUrl("https://t.me/" + rawUsername.replace("@", ""));
+            }
 
             List<InlineKeyboardButton> row = new ArrayList<>();
             row.add(channelButton);
             rows.add(row);
         }
+
 
         // Add confirmation button
         InlineKeyboardButton confirmButton = new InlineKeyboardButton();
