@@ -24,12 +24,23 @@ public class MessageTemplateService {
     private final MessageTemplateRepository repository;
     private final ChallengeRepository challengeRepository;
 
+    private Challenge resolveChallenge(Long challengeId) {
+        if (challengeId != null) {
+            Optional<Challenge> opt = challengeRepository.findById(challengeId);
+            if (opt.isPresent()) {
+                return opt.get();
+            }
+        }
+        return challengeRepository.findMainChallenge()
+                .orElseGet(() -> challengeRepository.findAll().stream().findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Challenge topilmadi: " + challengeId)));
+    }
+
     /**
      * Get message template by challenge and key
      */
     public Optional<MessageTemplate> getTemplate(Long challengeId, MessageKey messageKey) {
-        Challenge challenge = challengeRepository.findById(challengeId)
-                .orElseThrow(() -> new IllegalArgumentException("Challenge not found: " + challengeId));
+        Challenge challenge = resolveChallenge(challengeId);
         return repository.findByChallengeAndMessageKey(challenge, messageKey);
     }
 
@@ -55,8 +66,7 @@ public class MessageTemplateService {
      * Get all templates for a challenge
      */
     public List<MessageTemplate> getTemplatesForChallenge(Long challengeId) {
-        Challenge challenge = challengeRepository.findById(challengeId)
-                .orElseThrow(() -> new IllegalArgumentException("Challenge not found: " + challengeId));
+        Challenge challenge = resolveChallenge(challengeId);
         return repository.findByChallenge(challenge);
     }
 
@@ -65,8 +75,7 @@ public class MessageTemplateService {
      */
     @Transactional
     public void updateText(Long challengeId, MessageKey messageKey, String text) {
-        Challenge challenge = challengeRepository.findById(challengeId)
-                .orElseThrow(() -> new IllegalArgumentException("Challenge not found: " + challengeId));
+        Challenge challenge = resolveChallenge(challengeId);
 
         MessageTemplate template = repository.findByChallengeAndMessageKey(challenge, messageKey)
                 .orElseGet(() -> {
@@ -78,7 +87,7 @@ public class MessageTemplateService {
 
         template.setText(text);
         repository.save(template);
-        log.info("Updated text for challenge {} - {}: {}", challengeId, messageKey,
+        log.info("Updated text for challenge {} - {}: {}", challenge.getId(), messageKey,
                 text.substring(0, Math.min(50, text.length())));
     }
 
@@ -87,8 +96,7 @@ public class MessageTemplateService {
      */
     @Transactional
     public void updateImagePath(Long challengeId, MessageKey messageKey, String imagePath) {
-        Challenge challenge = challengeRepository.findById(challengeId)
-                .orElseThrow(() -> new IllegalArgumentException("Challenge not found: " + challengeId));
+        Challenge challenge = resolveChallenge(challengeId);
 
         MessageTemplate template = repository.findByChallengeAndMessageKey(challenge, messageKey)
                 .orElseGet(() -> {
@@ -100,7 +108,7 @@ public class MessageTemplateService {
 
         template.setImagePath(imagePath);
         repository.save(template);
-        log.info("Updated image path for challenge {} - {}: {}", challengeId, messageKey, imagePath);
+        log.info("Updated image path for challenge {} - {}: {}", challenge.getId(), messageKey, imagePath);
     }
 
     /**
@@ -108,8 +116,7 @@ public class MessageTemplateService {
      */
     @Transactional
     public void updateTemplate(Long challengeId, MessageKey messageKey, String text, String imagePath) {
-        Challenge challenge = challengeRepository.findById(challengeId)
-                .orElseThrow(() -> new IllegalArgumentException("Challenge not found: " + challengeId));
+        Challenge challenge = resolveChallenge(challengeId);
 
         MessageTemplate template = repository.findByChallengeAndMessageKey(challenge, messageKey)
                 .orElseGet(() -> {
@@ -127,7 +134,7 @@ public class MessageTemplateService {
         }
 
         repository.save(template);
-        log.info("Updated template for challenge {} - {}", challengeId, messageKey);
+        log.info("Updated template for challenge {} - {}", challenge.getId(), messageKey);
     }
 
     /**
@@ -135,8 +142,7 @@ public class MessageTemplateService {
      */
     @Transactional
     public void initializeDefaultTemplatesForChallenge(Long challengeId) {
-        Challenge challenge = challengeRepository.findById(challengeId)
-                .orElseThrow(() -> new IllegalArgumentException("Challenge not found: " + challengeId));
+        Challenge challenge = resolveChallenge(challengeId);
 
         // Initialize INFORMATION_MESSAGE
         if (!repository.existsByChallengeAndMessageKey(challenge, MessageKey.INFORMATION_MESSAGE)) {

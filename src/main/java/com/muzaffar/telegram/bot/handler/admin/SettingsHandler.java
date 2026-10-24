@@ -184,13 +184,10 @@ public class SettingsHandler {
         Long challengeId = getCurrentChallengeId(chatId);
         messageTemplateService.getImagePath(challengeId, MessageKey.INFORMATION_MESSAGE).ifPresent(imagePath -> {
             try {
-                String fullPath = botUtils.getFullImagePath(imagePath);
-                SendPhoto sendPhoto = new SendPhoto();
-                sendPhoto.setChatId(chatId.toString());
-                sendPhoto.setPhoto(new InputFile(new File(fullPath)));
-                sendPhoto.setCaption("🖼 *Hozirgi rasm:*");
-                Message sentPhoto = botSupplier.get().execute(sendPhoto);
-                stateManager.trackTempMessage(chatId, sentPhoto.getMessageId());
+                Message sentPhoto = botUtils.sendPhotoWithCaption(botSupplier.get(), chatId, imagePath, "🖼 *Hozirgi rasm:*");
+                if (sentPhoto != null) {
+                    stateManager.trackTempMessage(chatId, sentPhoto.getMessageId());
+                }
             } catch (Exception e) {
                 log.error("Error sending current information image", e);
             }

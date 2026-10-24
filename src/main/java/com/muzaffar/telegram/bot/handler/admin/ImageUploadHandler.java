@@ -2,7 +2,9 @@ package com.muzaffar.telegram.bot.handler.admin;
 
 import static com.muzaffar.telegram.constants.BotConstants.*;
 
+import com.muzaffar.telegram.entity.Challenge;
 import com.muzaffar.telegram.enums.MessageKey;
+import com.muzaffar.telegram.service.ChallengeService;
 import com.muzaffar.telegram.service.MessageTemplateService;
 import com.muzaffar.telegram.util.KeyboardBuilder;
 import com.muzaffar.telegram.util.TelegramBotUtils;
@@ -38,6 +40,7 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 public class ImageUploadHandler {
 
+    private final ChallengeService challengeService;
     private final MessageTemplateService messageTemplateService;
     private final AdminStateManager stateManager;
     private final AdminNavigationHandler navigationHandler;
@@ -330,7 +333,12 @@ public class ImageUploadHandler {
 
     private Long getCurrentChallengeId(Long chatId) {
         Long challengeId = stateManager.getCurrentChallengeId(chatId);
-        return challengeId != null ? challengeId : 1L;
+        if (challengeId != null) {
+            return challengeId;
+        }
+        return challengeService.getDefaultChallenge()
+                .map(Challenge::getId)
+                .orElse(1L);
     }
 
     private void cleanupTempMessages(Long chatId) {
