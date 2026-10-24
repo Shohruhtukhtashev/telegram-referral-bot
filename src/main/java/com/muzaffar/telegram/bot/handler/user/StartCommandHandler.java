@@ -214,8 +214,8 @@ public class StartCommandHandler implements BotHandler {
             // Store the challenge context for this user
             sessionService.setChallengeContext(chatId, challenge.getId());
 
-            // 1. Send greeting message first
-            SendMessage greetingMessage = messageService.createGreetingMessage(chatId, firstName);
+            // 1. Send greeting message first (with video guide)
+            SendMessage greetingMessage = messageService.createGreetingMessage(chatId, firstName, challenge.getId());
             botSupplier.get().execute(greetingMessage);
 
             // Small delay for better UX
@@ -384,21 +384,8 @@ public class StartCommandHandler implements BotHandler {
      * [Botdan foydalanish uchun video qo'llanma]({link})
      */
     private void sendWelcomeGuideMessage(Long chatId, String firstName, Challenge challenge) {
-        String name = (firstName != null && !firstName.trim().isEmpty()) ? firstName.trim() : "qadrli foydalanuvchi";
-        name = name.replace("*", "").replace("_", "").replace("[", "").replace("`", "");
-
-        String guideUrl = challengeService.getVideoGuideUrl(challenge != null ? challenge.getId() : null)
-                .orElse("https://t.me/Bot_uchun_Videoo");
-
-        String text = String.format("🌟 Botga xush kelibsiz, %s!\n\n[Botdan foydalanish uchun video qo'llanma](%s)",
-                name, guideUrl);
-
-        SendMessage message = new SendMessage();
-        message.setChatId(chatId.toString());
-        message.setText(text);
-        message.setParseMode("Markdown");
-        message.setDisableWebPagePreview(true);
-
+        SendMessage message = messageService.createGreetingMessage(chatId, firstName,
+                challenge != null ? challenge.getId() : null);
         try {
             botSupplier.get().execute(message);
         } catch (TelegramApiException e) {

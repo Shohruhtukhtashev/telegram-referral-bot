@@ -43,12 +43,31 @@ public class MessageService {
     }
 
     /**
-     * Create greeting message (sent first)
+     * Create greeting message (sent first) with video guide link
      */
     public SendMessage createGreetingMessage(Long chatId, String firstName) {
+        return createGreetingMessage(chatId, firstName, null);
+    }
+
+    public SendMessage createGreetingMessage(Long chatId, String firstName, Long challengeId) {
+        String name = (firstName != null && !firstName.trim().isEmpty()) ? firstName.trim() : "";
+        name = name.replace("*", "").replace("_", "").replace("[", "").replace("`", "");
+
+        String guideUrl = challengeService.getVideoGuideUrl(challengeId)
+                .orElse("https://t.me/Bot_uchun_Videoo");
+
+        String text;
+        if (!name.isEmpty()) {
+            text = String.format("🌟 Botga xush kelibsiz, %s!\n\n[Botdan foydalanish uchun video qo'llanma](%s)", name, guideUrl);
+        } else {
+            text = String.format("🌟 Botga xush kelibsiz!\n\n[Botdan foydalanish uchun video qo'llanma](%s)", guideUrl);
+        }
+
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
-        message.setText(String.format("🌟 Botga xush kelibsiz, %s!", firstName != null ? firstName : ""));
+        message.setText(text);
+        message.setParseMode("Markdown");
+        message.setDisableWebPagePreview(true);
         return message;
     }
 
