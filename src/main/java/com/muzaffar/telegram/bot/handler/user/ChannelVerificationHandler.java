@@ -17,19 +17,25 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChatMember;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.chatmember.ChatMember;
-import org.telegram.telegrambots.meta.api.objects.chatmember.ChatMemberLeft;
+import org.telegram.telegrambots.meta.api.objects.chatmember.ChatMemberRestricted;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * Handler for channel verification logic.
- * Manages channel subscription checks and verification process.
+ * Manages parallel channel subscription checks and strict verification process.
  */
 @Slf4j
 @Component
@@ -44,6 +50,9 @@ public class ChannelVerificationHandler {
 
     private Supplier<TelegramLongPollingBot> botSupplier;
 
+    // High performance pool for parallel Telegram API channel checks
+    private final ExecutorService verificationExecutor = Executors.newFixedThreadPool(10);
+
     /**
      * Initialize the handler with bot reference.
      */
@@ -52,15 +61,18 @@ public class ChannelVerificationHandler {
     }
 
     /**
-     * Handle channel verification callback
+     * Handle channel verification callback with callbackQueryId for instant feedback.
      */
-    public void handleChannelVerification(Long chatId, Integer messageId, String username,
-            String firstName, String lastName,
-            Runnable afterVerificationCallback) {
+    public void handleChannelVerification(Long chatId, Integer messageId, String callbackQueryId,
+                                         String username, String firstName, String lastName,
+                                         Runnable afterVerificationCallback) {
         // Determine which challenge to use
         Challenge challenge = determineChallenge(chatId);
 
         if (challenge == null) {
+            if (callbackQueryId != null) {
+                botUtils.answerCallbackQuery(botSupplier.get(), callbackQueryId, "❌ Hozircha faol challenge yo'q.", true);
+            }
             botUtils.editMessage(botSupplier.get(), chatId, messageId, "❌ Hozircha faol challenge yo'q.");
             return;
         }
@@ -69,25 +81,23 @@ public class ChannelVerificationHandler {
         List<ChallengeChannel> activeChannels = challengeService.getActiveChannelsForChallenge(challenge.getId());
 
         if (activeChannels.isEmpty()) {
-            botUtils.editMessage(botSupplier.get(), chatId, messageId, "✅ Verification complete!");
+            if (callbackQueryId != null) {
+                botUtils.answerCallbackQuery(botSupplier.get(), callbackQueryId, "✅ Tasdiqlandi!", false);
+            }
+            botUtils.editMessage(botSupplier.get(), chatId, messageId, "✅ Barcha kanallarga obuna bo'lganingiz tasdiqlandi!");
             challengeUserService.markUserAsVerified(challenge.getId(), chatId);
             afterVerificationCallback.run();
             return;
         }
 
-        // Check if user is member of all channels
-        boolean allSubscribed = true;
-        StringBuilder notSubscribedChannels = new StringBuilder();
+        // Parallel check across ALL channels
+        List<ChallengeChannel> missingChannels = getMissingChallengeChannels(chatId, activeChannels);
 
-        for (ChallengeChannel channel : activeChannels) {
-            if (!isUserMemberOfChallengeChannel(chatId, channel)) {
-                allSubscribed = false;
-                notSubscribedChannels.append("• ").append(channel.getChannelName()).append("\n");
+        if (missingChannels.isEmpty()) {
+            // User is strictly subscribed to EVERY single channel
+            if (callbackQueryId != null) {
+                botUtils.answerCallbackQuery(botSupplier.get(), callbackQueryId, "✅ Barcha kanallarga obuna bo'lganingiz tasdiqlandi!", false);
             }
-        }
-
-        if (allSubscribed) {
-            // User is subscribed to all channels
             botUtils.editMessage(botSupplier.get(), chatId, messageId,
                     "✅ Barcha kanallarga obuna bo'lganingiz tasdiqlandi!");
 
@@ -97,20 +107,69 @@ public class ChannelVerificationHandler {
             // Trigger after verification callback
             afterVerificationCallback.run();
         } else {
-            // User is not subscribed to all channels
-            String errorMessage = "❌ Iltimos, avval quyidagi kanallarga obuna bo'ling:\n\n"
-                    + notSubscribedChannels.toString();
-            botUtils.editMessage(botSupplier.get(), chatId, messageId, errorMessage);
+            // User has NOT subscribed to all channels - DO NOT ALLOW TO PROCEED!
+            log.info("User {} failed verification. Missing {} channels out of {}",
+                    chatId, missingChannels.size(), activeChannels.size());
 
-            // Resend subscription buttons
-            try {
-                Thread.sleep(RETRY_DELAY_MS);
-                SendMessage channelMessage = createChallengeChannelSubscriptionMessage(chatId, activeChannels);
-                botSupplier.get().execute(channelMessage);
-            } catch (Exception e) {
-                log.error("Error resending channel subscription message", e);
+            String channelWord = (activeChannels.size() > 1) ? "kanallarga" : "kanalga";
+            if (callbackQueryId != null) {
+                botUtils.answerCallbackQuery(botSupplier.get(), callbackQueryId,
+                        "❌ Siz hali barcha " + channelWord + " a'zo bo'lmadingiz! Iltimos, barchasiga a'zo bo'ling.", true);
             }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("Assalomu alaykum\n\n");
+            sb.append("⚠️ *Siz hali quyidagi ").append(channelWord).append(" obuna bo'lmadingiz:*\n\n");
+            for (ChallengeChannel ch : missingChannels) {
+                sb.append("❌ *").append(ch.getChannelName()).append("*\n");
+            }
+            sb.append("\nBotdan to’liq foydalanish uchun barcha ").append(channelWord).append(" obuna bo’ling😊\n\n");
+            sb.append("Keyin \"✅ A'zo bo'ldim\" tugmasini bosing!");
+
+            InlineKeyboardMarkup keyboard = createChallengeChannelSubscriptionKeyboard(activeChannels);
+            botUtils.editMessageWithKeyboard(botSupplier.get(), chatId, messageId, sb.toString(), keyboard);
         }
+    }
+
+    /**
+     * Backward-compatible overload
+     */
+    public void handleChannelVerification(Long chatId, Integer messageId, String username,
+                                         String firstName, String lastName,
+                                         Runnable afterVerificationCallback) {
+        handleChannelVerification(chatId, messageId, null, username, firstName, lastName, afterVerificationCallback);
+    }
+
+    /**
+     * Create inline keyboard with channel buttons and "A'zo bo'ldim" button
+     */
+    public InlineKeyboardMarkup createChallengeChannelSubscriptionKeyboard(List<ChallengeChannel> channels) {
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        for (ChallengeChannel channel : channels) {
+            List<InlineKeyboardButton> row = new ArrayList<>();
+            InlineKeyboardButton channelButton = new InlineKeyboardButton();
+            channelButton.setText(channel.getChannelName());
+            String rawUsername = channel.getChannelUsername() != null ? channel.getChannelUsername().trim() : "";
+            if (rawUsername.startsWith("http://") || rawUsername.startsWith("https://")) {
+                channelButton.setUrl(rawUsername);
+            } else {
+                channelButton.setUrl("https://t.me/" + rawUsername.replace("@", ""));
+            }
+            row.add(channelButton);
+            rows.add(row);
+        }
+
+        List<InlineKeyboardButton> verifyRow = new ArrayList<>();
+        InlineKeyboardButton verifyButton = new InlineKeyboardButton();
+        verifyButton.setText("✅ A'zo bo'ldim");
+        verifyButton.setCallbackData(CALLBACK_VERIFY_CHANNELS);
+        verifyRow.add(verifyButton);
+        rows.add(verifyRow);
+
+        keyboard.setKeyboard(rows);
+        return keyboard;
     }
 
     /**
@@ -126,94 +185,92 @@ public class ChannelVerificationHandler {
         StringBuilder text = new StringBuilder();
         text.append("Assalomu alaykum\n\n");
         text.append("Botdan to’liq foydalanish uchun quyidagi ").append(channelWord).append(" obuna bo’ling😊\n\n");
-        text.append("Keyin \"✅ A'zo bo'ldim \" tugmasini bosing!");
+        text.append("Keyin \"✅ A'zo bo'ldim\" tugmasini bosing!");
         message.setText(text.toString());
-
-
-        // Create keyboard with channel buttons + verify button
-        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-
-        // Add a button for each channel
-        for (ChallengeChannel channel : channels) {
-            List<InlineKeyboardButton> row = new ArrayList<>();
-            InlineKeyboardButton channelButton = new InlineKeyboardButton();
-            channelButton.setText(channel.getChannelName());
-            String rawUsername = channel.getChannelUsername() != null ? channel.getChannelUsername().trim() : "";
-            if (rawUsername.startsWith("http://") || rawUsername.startsWith("https://")) {
-                channelButton.setUrl(rawUsername);
-            } else {
-                channelButton.setUrl("https://t.me/" + rawUsername.replace("@", ""));
-            }
-            row.add(channelButton);
-            rows.add(row);
-        }
-
-
-
-        // Add verify button at the bottom
-        List<InlineKeyboardButton> verifyRow = new ArrayList<>();
-        InlineKeyboardButton verifyButton = new InlineKeyboardButton();
-        verifyButton.setText("✅ A'zo bo'ldim");
-        verifyButton.setCallbackData(CALLBACK_VERIFY_CHANNELS);
-        verifyRow.add(verifyButton);
-        rows.add(verifyRow);
-
-        keyboard.setKeyboard(rows);
-        message.setReplyMarkup(keyboard);
+        message.setReplyMarkup(createChallengeChannelSubscriptionKeyboard(channels));
 
         return message;
     }
 
     /**
-     * Check if user is member of a challenge channel
-     * Tries both numeric ID and @username format
+     * Check if user is member of a challenge channel.
+     * Only returns true if status is positively verified as creator, administrator, member, or valid restricted.
      */
     public boolean isUserMemberOfChallengeChannel(Long userId, ChallengeChannel channel) {
-        // Try with numeric channel ID first
-        ChatMember chatMember = tryGetChatMember(userId, channel.getChannelId());
+        if (channel == null) {
+            return false;
+        }
 
-        // If failed and we have a username, try with @username format
-        if (chatMember == null && channel.getChannelUsername() != null && !channel.getChannelUsername().isEmpty()) {
-            log.info("Retrying with @username format for channel: {}", channel.getChannelName());
-            String raw = channel.getChannelUsername().trim();
-            String cleanUser;
-            if (raw.startsWith("http://") || raw.startsWith("https://")) {
-                cleanUser = raw.substring(raw.lastIndexOf('/') + 1).replace("@", "");
-            } else {
-                cleanUser = raw.replace("@", "");
+        // 1. Try with channelId (numeric ID) first
+        if (channel.getChannelId() != null && !channel.getChannelId().trim().isEmpty()) {
+            ChatMember chatMember = tryGetChatMember(userId, channel.getChannelId().trim());
+            if (isChatMemberActive(chatMember)) {
+                log.info("User {} confirmed member in channel {} via ID {}", userId, channel.getChannelName(), channel.getChannelId());
+                return true;
             }
-            String usernameFormat = "@" + cleanUser;
-            chatMember = tryGetChatMember(userId, usernameFormat);
         }
 
-        if (chatMember != null) {
-            String status = chatMember.getStatus();
-            // Check if user is a member (not "left" or "kicked")
-            boolean isMember = !"left".equals(status) && !"kicked".equals(status);
-            log.info("User {} membership in channel {} ({}): {}", userId, channel.getChannelName(), status, isMember);
-            return isMember;
+        // 2. Fallback to @username format if ID check did not confirm membership
+        if (channel.getChannelUsername() != null && !channel.getChannelUsername().trim().isEmpty()) {
+            String raw = channel.getChannelUsername().trim();
+            if (raw.startsWith("http://") || raw.startsWith("https://")) {
+                raw = raw.substring(raw.lastIndexOf('/') + 1);
+            }
+            String cleanUser = raw.replace("@", "").trim();
+            if (!cleanUser.isEmpty()) {
+                ChatMember chatMember = tryGetChatMember(userId, "@" + cleanUser);
+                if (isChatMemberActive(chatMember)) {
+                    log.info("User {} confirmed member in channel {} via @{}", userId, channel.getChannelName(), cleanUser);
+                    return true;
+                }
+            }
         }
 
-        log.error("⚠️ CONFIGURATION ERROR: Bot cannot access channel {} (ID: {}, Username: @{}). " +
-                "The bot must be added as an ADMINISTRATOR to the channel! " +
-                "Please add the bot as admin in the channel settings.",
-                channel.getChannelName(), channel.getChannelId(), channel.getChannelUsername());
-
+        log.warn("User {} is NOT a member in channel {} (ID: {}, Username: @{})",
+                userId, channel.getChannelName(), channel.getChannelId(), channel.getChannelUsername());
         return false;
     }
 
     /**
-     * Get list of channels the user is NOT a member of
+     * Positive whitelist check: ONLY true if user is currently active in the chat.
+     */
+    private boolean isChatMemberActive(ChatMember chatMember) {
+        if (chatMember == null || chatMember.getStatus() == null) {
+            return false;
+        }
+        String status = chatMember.getStatus().trim().toLowerCase();
+        if ("creator".equals(status) || "administrator".equals(status) || "member".equals(status)) {
+            return true;
+        }
+        if ("restricted".equals(status)) {
+            if (chatMember instanceof ChatMemberRestricted restricted) {
+                return Boolean.TRUE.equals(restricted.getIsMember());
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Parallel check: returns list of channels the user is NOT a member of.
      */
     public List<ChallengeChannel> getMissingChallengeChannels(Long userId, List<ChallengeChannel> channels) {
-        List<ChallengeChannel> missing = new ArrayList<>();
-        for (ChallengeChannel channel : channels) {
-            if (!isUserMemberOfChallengeChannel(userId, channel)) {
-                missing.add(channel);
-            }
+        if (channels == null || channels.isEmpty()) {
+            return Collections.emptyList();
         }
-        return missing;
+
+        // Check all channels concurrently for ultra-fast response
+        List<CompletableFuture<ChallengeChannel>> futures = channels.stream()
+                .map(channel -> CompletableFuture.supplyAsync(() -> {
+                    boolean isMember = isUserMemberOfChallengeChannel(userId, channel);
+                    return isMember ? null : channel;
+                }, verificationExecutor))
+                .toList();
+
+        return futures.stream()
+                .map(CompletableFuture::join)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -242,27 +299,15 @@ public class ChannelVerificationHandler {
             log.debug("Successfully checked membership for userId={} in chatId={}", userId, chatId);
             return chatMember;
         } catch (TelegramApiException e) {
-            String errorMsg = e.getMessage();
-
-            if (errorMsg != null && errorMsg.contains("chat not found")) {
-                log.warn("Chat not found with identifier '{}' - bot may not be admin or ID is incorrect", chatId);
+            String errorMsg = e.getMessage() != null ? e.getMessage() : "";
+            if (errorMsg.contains("USER_NOT_PARTICIPANT") || errorMsg.contains("user not found")) {
+                log.debug("User {} is confirmed NOT a participant of {}", userId, chatId);
                 return null;
-            } else if (errorMsg != null
-                    && (errorMsg.contains("USER_NOT_PARTICIPANT") || errorMsg.contains("user not found"))) {
-                log.debug("User {} is not a member of {}", userId, chatId);
-                ChatMemberLeft leftMember = new ChatMemberLeft();
-                org.telegram.telegrambots.meta.api.objects.User user = new org.telegram.telegrambots.meta.api.objects.User();
-                user.setId(userId);
-                user.setFirstName("");
-                user.setIsBot(false);
-                leftMember.setUser(user);
-                return leftMember;
-            } else if (errorMsg != null && errorMsg.contains("Bad Request")) {
-                log.warn("Bad request error for chatId '{}': {}", chatId, errorMsg);
+            } else if (errorMsg.contains("chat not found") || errorMsg.contains("bot is not a member")) {
+                log.warn("Chat '{}' not accessible by bot: {}", chatId, errorMsg);
                 return null;
             } else {
-                log.debug("Unexpected error checking membership for userId={}, chatId={}: {}", userId, chatId,
-                        errorMsg);
+                log.debug("Telegram API error checking membership for userId={}, chatId={}: {}", userId, chatId, errorMsg);
                 return null;
             }
         }

@@ -13,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -23,6 +25,20 @@ public class ChallengeService {
     private final ChallengeRepository challengeRepository;
     private final ChallengeChannelRepository challengeChannelRepository;
     private final ChallengeUserRepository challengeUserRepository;
+
+    // High-performance thread-safe in-memory cache
+    private volatile Challenge cachedMainChallenge = null;
+    private volatile long cachedMainChallengeTime = 0;
+    private final Map<Long, List<ChallengeChannel>> activeChannelsCache = new ConcurrentHashMap<>();
+    private final Map<Long, Long> activeChannelsCacheTime = new ConcurrentHashMap<>();
+    private static final long CACHE_TTL_MS = 60_000; // 60 seconds TTL
+
+    public void invalidateCache() {
+        cachedMainChallenge = null;
+        activeChannelsCache.clear();
+        activeChannelsCacheTime.clear();
+        log.debug("ChallengeService in-memory cache invalidated");
+    }
     
     /**
      * Create a new challenge
@@ -37,6 +53,7 @@ public class ChallengeService {
                 .build();
         
         Challenge saved = challengeRepository.save(challenge);
+        invalidateCache();
         log.info("Created new challenge: {} (ID: {})", name, saved.getId());
         return saved;
     }
@@ -63,10 +80,19 @@ public class ChallengeService {
     }
     
     /**
-     * Get the main challenge (for new users)
+     * Get the main challenge (for new users) - served from cache
      */
     public Optional<Challenge> getDefaultChallenge() {
-        return challengeRepository.findMainChallenge();
+        long now = System.currentTimeMillis();
+        if (cachedMainChallenge != null && (now - cachedMainChallengeTime) < CACHE_TTL_MS) {
+            return Optional.of(cachedMainChallenge);
+        }
+        Optional<Challenge> main = challengeRepository.findMainChallenge();
+        main.ifPresent(c -> {
+            cachedMainChallenge = c;
+            cachedMainChallengeTime = now;
+        });
+        return main;
     }
     
     /**
@@ -93,6 +119,7 @@ public class ChallengeService {
         // Set this challenge as main
         challenge.setIsMain(true);
         challengeRepository.save(challenge);
+        invalidateCache();
         log.info("Set challenge {} as main challenge", challengeId);
     }
     
@@ -107,6 +134,7 @@ public class ChallengeService {
         challenge.setPrivateChannelId(privateChannelId);
         
         Challenge updated = challengeRepository.save(challenge);
+        invalidateCache();
         log.info("Updated privateChannelId for challenge {}: {}", challengeId, privateChannelId);
         return updated;
     }
@@ -122,6 +150,7 @@ public class ChallengeService {
         challenge.setRequiredReferralCount(requiredReferralCount);
         
         Challenge updated = challengeRepository.save(challenge);
+        invalidateCache();
         log.info("Updated requiredReferralCount for challenge {}: {}", challengeId, requiredReferralCount);
         return updated;
     }
@@ -136,6 +165,7 @@ public class ChallengeService {
         
         challenge.setIsActive(isActive);
         challengeRepository.save(challenge);
+        invalidateCache();
         log.info("Challenge {} is now {}", challengeId, isActive ? "active" : "inactive");
     }
     
@@ -149,6 +179,7 @@ public class ChallengeService {
         }
         
         challengeRepository.deleteById(challengeId);
+        invalidateCache();
         log.warn("Deleted challenge: {}", challengeId);
     }
     
@@ -175,6 +206,7 @@ public class ChallengeService {
                 .build();
         
         ChallengeChannel saved = challengeChannelRepository.save(challengeChannel);
+        invalidateCache();
         log.info("Added channel {} to challenge {}", channelName, challengeId);
         return saved;
     }
@@ -189,12 +221,23 @@ public class ChallengeService {
     }
     
     /**
-     * Get active channels for a challenge
+     * Get active channels for a challenge - served from cache
      */
     public List<ChallengeChannel> getActiveChannelsForChallenge(Long challengeId) {
+        long now = System.currentTimeMillis();
+        Long cacheTime = activeChannelsCacheTime.get(challengeId);
+        if (cacheTime != null && (now - cacheTime) < CACHE_TTL_MS) {
+            List<ChallengeChannel> cached = activeChannelsCache.get(challengeId);
+            if (cached != null) {
+                return cached;
+            }
+        }
         Challenge challenge = challengeRepository.findById(challengeId)
                 .orElseThrow(() -> new IllegalArgumentException("Challenge not found: " + challengeId));
-        return challengeChannelRepository.findActiveChannelsByChallenge(challenge);
+        List<ChallengeChannel> channels = challengeChannelRepository.findActiveChannelsByChallenge(challenge);
+        activeChannelsCache.put(challengeId, channels);
+        activeChannelsCacheTime.put(challengeId, now);
+        return channels;
     }
     
     /**
@@ -207,6 +250,7 @@ public class ChallengeService {
         
         if (channelOpt.isPresent()) {
             challengeChannelRepository.delete(channelOpt.get());
+            invalidateCache();
             log.info("Removed channel {} from challenge {}", channelId, challengeId);
             return true;
         }

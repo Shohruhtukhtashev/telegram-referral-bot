@@ -14,6 +14,9 @@ import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 /**
  * Refactored AdminTelegramBot that delegates to handlers.
  * This version is significantly smaller and more maintainable.
@@ -37,6 +40,9 @@ public class AdminTelegramBot extends TelegramLongPollingBot {
     // Reference to referral bot for broadcasting - using ObjectProvider to avoid
     // circular dependency
     private final ObjectProvider<ReferralTelegramBot> referralBotProvider;
+
+    // High performance asynchronous update processing pool
+    private final ExecutorService updateExecutor = Executors.newFixedThreadPool(8);
 
     public AdminTelegramBot(BotConfig botConfig,
             TelegramBotUtils botUtils,
@@ -88,43 +94,47 @@ public class AdminTelegramBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        try {
-            if (update.hasMessage()) {
-                Message message = update.getMessage();
-                Long chatId = message.getChatId();
+        updateExecutor.submit(() -> {
+            try {
+                if (update.hasMessage()) {
+                    Message message = update.getMessage();
+                    Long chatId = message.getChatId();
 
-                if (!isAdmin(chatId)) {
-                    sendMessage(chatId, "❌ Sizda ushbu botdan foydalanish huquqi yo'q.");
-                    return;
-                }
-
-                if (message.hasText()) {
-                    handleTextMessage(chatId, message);
-                } else if (message.hasPhoto()) {
-                    if (STATE_AWAITING_CUSTOM_BROADCAST_MESSAGE.equals(stateManager.getState(chatId))) {
-                        broadcastHandler.handleCustomBroadcastPhotoInput(chatId, message);
-                    } else {
-                        imageUploadHandler.handlePhotoUpload(chatId, message);
+                    if (!isAdmin(chatId)) {
+                        sendMessage(chatId, "❌ Sizda ushbu botdan foydalanish huquqi yo'q.");
+                        return;
                     }
-                } else if (message.hasDocument()) {
-                    imageUploadHandler.handleDocumentUpload(chatId, message);
-                }
-            } else if (update.hasCallbackQuery()) {
-                CallbackQuery callbackQuery = update.getCallbackQuery();
-                Long chatId = callbackQuery.getMessage().getChatId();
 
-                if (!isAdmin(chatId)) {
-                    return;
-                }
+                    if (message.hasText()) {
+                        handleTextMessage(chatId, message);
+                    } else if (message.hasPhoto()) {
+                        if (STATE_AWAITING_CUSTOM_BROADCAST_MESSAGE.equals(stateManager.getState(chatId))) {
+                            broadcastHandler.handleCustomBroadcastPhotoInput(chatId, message);
+                        } else {
+                            imageUploadHandler.handlePhotoUpload(chatId, message);
+                        }
+                    } else if (message.hasDocument()) {
+                        imageUploadHandler.handleDocumentUpload(chatId, message);
+                    }
+                } else if (update.hasCallbackQuery()) {
+                    CallbackQuery callbackQuery = update.getCallbackQuery();
+                    Long chatId = callbackQuery.getMessage().getChatId();
 
-                handleCallbackQuery(callbackQuery);
+                    botUtils.answerCallbackQuery(this, callbackQuery.getId(), null, false);
+
+                    if (!isAdmin(chatId)) {
+                        return;
+                    }
+
+                    handleCallbackQuery(callbackQuery);
+                }
+            } catch (Exception e) {
+                log.error("Error processing admin update", e);
+                if (update.hasMessage()) {
+                    sendMessage(update.getMessage().getChatId(), "❌ Xatolik yuz berdi. Iltimos qaytadan urinib ko'ring.");
+                }
             }
-        } catch (Exception e) {
-            log.error("Error processing update", e);
-            if (update.hasMessage()) {
-                sendMessage(update.getMessage().getChatId(), "❌ Xatolik yuz berdi. Iltimos qaytadan urinib ko'ring.");
-            }
-        }
+        });
     }
 
     /**

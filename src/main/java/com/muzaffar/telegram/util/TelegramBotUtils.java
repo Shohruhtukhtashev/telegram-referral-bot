@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
@@ -111,6 +112,54 @@ public class TelegramBotUtils {
             bot.execute(editMessage);
         } catch (TelegramApiException e) {
             log.error("Failed to edit message chatId={}, messageId={}", chatId, messageId, e);
+        }
+    }
+
+    /**
+     * Edit an existing message text and keyboard.
+     * 
+     * @param bot The bot instance to use
+     * @param chatId The chat ID
+     * @param messageId The message ID to edit
+     * @param newText The new text
+     * @param keyboard The new inline keyboard
+     */
+    public void editMessageWithKeyboard(TelegramLongPollingBot bot, Long chatId, Integer messageId, String newText, InlineKeyboardMarkup keyboard) {
+        try {
+            EditMessageText editMessage = new EditMessageText();
+            editMessage.setChatId(chatId.toString());
+            editMessage.setMessageId(messageId);
+            editMessage.setText(newText);
+            editMessage.setParseMode("Markdown");
+            editMessage.setReplyMarkup(keyboard);
+            bot.execute(editMessage);
+        } catch (TelegramApiException e) {
+            log.error("Failed to edit message with keyboard chatId={}, messageId={}", chatId, messageId, e);
+        }
+    }
+
+    /**
+     * Answer callback query to remove spinner and optionally show toast/alert.
+     * 
+     * @param bot The bot instance to use
+     * @param callbackQueryId The callback query ID
+     * @param text Optional text to display
+     * @param showAlert true for modal alert popup, false for notification toast
+     */
+    public void answerCallbackQuery(TelegramLongPollingBot bot, String callbackQueryId, String text, boolean showAlert) {
+        if (callbackQueryId == null || callbackQueryId.isEmpty()) {
+            return;
+        }
+        try {
+            AnswerCallbackQuery answer = new AnswerCallbackQuery();
+            answer.setCallbackQueryId(callbackQueryId);
+            if (text != null && !text.isEmpty()) {
+                answer.setText(text);
+            }
+            answer.setShowAlert(showAlert);
+            bot.execute(answer);
+        } catch (TelegramApiException e) {
+            log.warn("Failed to answer callback query id={}: {}", callbackQueryId, e.getMessage());
         }
     }
     

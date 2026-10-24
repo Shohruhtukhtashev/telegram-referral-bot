@@ -17,6 +17,9 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 /**
  * Refactored ReferralTelegramBot that delegates to handlers.
  * This version is significantly smaller and more maintainable.
@@ -35,6 +38,9 @@ public class ReferralTelegramBot extends TelegramLongPollingBot {
     private final ChannelVerificationHandler channelVerificationHandler;
     private final ReferralHandler referralHandler;
     private final InlineQueryHandler inlineQueryHandler;
+
+    // High performance asynchronous update processing pool
+    private final ExecutorService updateExecutor = Executors.newFixedThreadPool(16);
 
     public ReferralTelegramBot(BotConfig botConfig,
             TelegramBotUtils botUtils,
@@ -88,20 +94,22 @@ public class ReferralTelegramBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        try {
-            if (update.hasMessage() && update.getMessage().hasText()) {
-                handleTextMessage(update);
-            } else if (update.hasCallbackQuery()) {
-                handleCallbackQuery(update.getCallbackQuery());
-            } else if (update.hasInlineQuery()) {
-                inlineQueryHandler.handle(update);
+        updateExecutor.submit(() -> {
+            try {
+                if (update.hasMessage() && update.getMessage().hasText()) {
+                    handleTextMessage(update);
+                } else if (update.hasCallbackQuery()) {
+                    handleCallbackQuery(update.getCallbackQuery());
+                } else if (update.hasInlineQuery()) {
+                    inlineQueryHandler.handle(update);
+                }
+            } catch (Exception e) {
+                log.error("Error processing update", e);
+                if (update.hasMessage()) {
+                    sendMessage(update.getMessage().getChatId(), "❌ Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.");
+                }
             }
-        } catch (Exception e) {
-            log.error("Error processing update", e);
-            if (update.hasMessage()) {
-                sendMessage(update.getMessage().getChatId(), "❌ Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.");
-            }
-        }
+        });
     }
 
     /**
@@ -133,26 +141,30 @@ public class ReferralTelegramBot extends TelegramLongPollingBot {
         String username = callbackQuery.getFrom().getUserName();
         String firstName = callbackQuery.getFrom().getFirstName();
         String lastName = callbackQuery.getFrom().getLastName();
+        String callbackId = callbackQuery.getId();
 
         log.info("Received callback from chatId={}: {}", chatId, data);
 
         switch (data) {
             case CALLBACK_START_BOT:
+                botUtils.answerCallbackQuery(this, callbackId, null, false);
                 startCommandHandler.handleStartButton(chatId, messageId, username, firstName, lastName);
                 break;
 
             case CALLBACK_VERIFY_CHANNELS:
                 channelVerificationHandler.handleChannelVerification(
-                        chatId, messageId, username, firstName, lastName,
+                        chatId, messageId, callbackId, username, firstName, lastName,
                         () -> startCommandHandler.sendInformationMessageAfterVerification(chatId, username, firstName,
                                 lastName));
                 break;
 
             case CALLBACK_MY_REFERRALS:
+                botUtils.answerCallbackQuery(this, callbackId, null, false);
                 referralHandler.handleMyReferrals(chatId, username, firstName, lastName);
                 break;
 
             default:
+                botUtils.answerCallbackQuery(this, callbackId, null, false);
                 log.warn("Unknown callback data: {}", data);
                 break;
         }
