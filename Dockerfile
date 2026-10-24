@@ -14,6 +14,8 @@ RUN mvn clean package -DskipTests -B
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
+RUN mkdir -p /app/images/bot_images/stats_headers /app/bot_images/stats_headers
+
 COPY --from=build /app/target/telegram-referral-bot-*.jar app.jar
 
 ENV PORT=8080

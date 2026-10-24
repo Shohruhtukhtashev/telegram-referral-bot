@@ -98,6 +98,14 @@ public class ImageUploadHandler {
                 return;
             }
 
+            // If the photo also has a caption, update the text as well
+            String caption = message.getCaption();
+            if (caption != null && !caption.trim().isEmpty()) {
+                Long challengeId = getCurrentChallengeId(chatId);
+                messageTemplateService.updateText(challengeId, templateKey, caption.trim());
+                log.info("Updated template text from photo caption for {}: {}", templateKey, caption.trim());
+            }
+
             saveImage(chatId, message.getMessageId(), templateKey, processedFile);
 
         } catch (Exception e) {
@@ -172,6 +180,14 @@ public class ImageUploadHandler {
                 return;
             }
 
+            // If the document also has a caption, update the text as well
+            String caption = message.getCaption();
+            if (caption != null && !caption.trim().isEmpty()) {
+                Long challengeId = getCurrentChallengeId(chatId);
+                messageTemplateService.updateText(challengeId, templateKey, caption.trim());
+                log.info("Updated template text from document caption for {}: {}", templateKey, caption.trim());
+            }
+
             saveImage(chatId, message.getMessageId(), templateKey, processedFile);
 
         } catch (Exception e) {
@@ -191,10 +207,16 @@ public class ImageUploadHandler {
      */
     private void saveImage(Long chatId, Integer messageId, MessageKey templateKey, File processedFile)
             throws IOException {
-        String fileName = "stats_header_" + System.currentTimeMillis() + ".jpg";
+        String prefix = (templateKey == MessageKey.INFORMATION_MESSAGE ? "info_" : "forward_");
+        String fileName = prefix + System.currentTimeMillis() + ".jpg";
         String relativePath = IMAGES_RELATIVE_DIRECTORY + fileName;
         String fullPath = botUtils.getFullImagePath(relativePath);
         Path destinationPath = Paths.get(fullPath);
+
+        // Ensure parent directory exists!
+        if (destinationPath.getParent() != null) {
+            Files.createDirectories(destinationPath.getParent());
+        }
 
         Long challengeId = getCurrentChallengeId(chatId);
         messageTemplateService.getImagePath(challengeId, templateKey).ifPresent(oldPath -> {
@@ -207,7 +229,11 @@ public class ImageUploadHandler {
             }
         });
 
-        Files.move(processedFile.toPath(), destinationPath, StandardCopyOption.REPLACE_EXISTING);
+        // Safely copy across filesystem boundaries and remove temp file
+        Files.copy(processedFile.toPath(), destinationPath, StandardCopyOption.REPLACE_EXISTING);
+        try {
+            Files.deleteIfExists(processedFile.toPath());
+        } catch (Exception ignored) {}
 
         messageTemplateService.updateImagePath(challengeId, templateKey, relativePath);
 
@@ -216,9 +242,9 @@ public class ImageUploadHandler {
 
         String successMessage;
         if (templateKey == MessageKey.INFORMATION_MESSAGE) {
-            successMessage = "✅ *Information rasmi o'zgartirildi!*\n\nRasm muvaffaqiyatli saqlandi.";
+            successMessage = "✅ *Information rasmi muvaffaqiyatli saqlandi!*";
         } else {
-            successMessage = "✅ *Forward xabar rasmi o'zgartirildi!*\n\nRasm muvaffaqiyatli saqlandi.";
+            successMessage = "✅ *Forward xabar rasmi muvaffaqiyatli saqlandi!*";
         }
         sendMessage(chatId, successMessage, navigationHandler.createBackButton());
 
