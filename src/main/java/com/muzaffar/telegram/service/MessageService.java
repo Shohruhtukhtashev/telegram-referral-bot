@@ -326,6 +326,9 @@ public class MessageService {
 
         StringBuilder text = new StringBuilder();
         text.append("Bizning loyihamizda ishtirok etish uchun bizning sahifalarimizga a'zo bo'ling.\n\n");
+        text.append("Shuningdek, quyidagi tarmoqlarga ham a'zo bo'ling:\n");
+        text.append("📸 Instagram: ").append(INSTAGRAM_URL.replace("_", "\\_")).append("\n");
+        text.append("▶️ YouTube: ").append(YOUTUBE_URL.replace("_", "\\_")).append("\n\n");
         text.append("*Keyin \"✅ A'zo bo'ldim\" tugmasini bosing!*\n\n");
 
         message.setText(text.toString());
@@ -337,21 +340,38 @@ public class MessageService {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         // Add channel buttons
-        for (com.muzaffar.telegram.entity.ChallengeChannel channel : channels) {
-            InlineKeyboardButton channelButton = new InlineKeyboardButton();
-            channelButton.setText(channel.getChannelName());
-            String rawUsername = channel.getChannelUsername() != null ? channel.getChannelUsername().trim() : "";
-            if (rawUsername.startsWith("http://") || rawUsername.startsWith("https://")) {
-                channelButton.setUrl(rawUsername);
-            } else {
-                channelButton.setUrl("https://t.me/" + rawUsername.replace("@", ""));
-            }
+        if (channels != null) {
+            for (com.muzaffar.telegram.entity.ChallengeChannel channel : channels) {
+                InlineKeyboardButton channelButton = new InlineKeyboardButton();
+                channelButton.setText(channel.getChannelName());
+                String rawUsername = channel.getChannelUsername() != null ? channel.getChannelUsername().trim() : "";
+                if (rawUsername.startsWith("http://") || rawUsername.startsWith("https://")) {
+                    channelButton.setUrl(rawUsername);
+                } else {
+                    channelButton.setUrl("https://t.me/" + rawUsername.replace("@", ""));
+                }
 
-            List<InlineKeyboardButton> row = new ArrayList<>();
-            row.add(channelButton);
-            rows.add(row);
+                List<InlineKeyboardButton> row = new ArrayList<>();
+                row.add(channelButton);
+                rows.add(row);
+            }
         }
 
+        // Instagram button
+        List<InlineKeyboardButton> instagramRow = new ArrayList<>();
+        InlineKeyboardButton instagramButton = new InlineKeyboardButton();
+        instagramButton.setText(BUTTON_INSTAGRAM);
+        instagramButton.setUrl(INSTAGRAM_URL);
+        instagramRow.add(instagramButton);
+        rows.add(instagramRow);
+
+        // YouTube button
+        List<InlineKeyboardButton> youtubeRow = new ArrayList<>();
+        InlineKeyboardButton youtubeButton = new InlineKeyboardButton();
+        youtubeButton.setText(BUTTON_YOUTUBE);
+        youtubeButton.setUrl(YOUTUBE_URL);
+        youtubeRow.add(youtubeButton);
+        rows.add(youtubeRow);
 
         // Add confirmation button
         InlineKeyboardButton confirmButton = new InlineKeyboardButton();

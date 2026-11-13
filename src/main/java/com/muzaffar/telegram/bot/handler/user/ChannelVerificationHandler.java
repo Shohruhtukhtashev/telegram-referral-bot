@@ -135,23 +135,41 @@ public class ChannelVerificationHandler {
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
-        for (ChallengeChannel channel : channels) {
-            List<InlineKeyboardButton> row = new ArrayList<>();
-            InlineKeyboardButton channelButton = new InlineKeyboardButton();
-            channelButton.setText(channel.getChannelName());
-            String rawUsername = channel.getChannelUsername() != null ? channel.getChannelUsername().trim() : "";
-            if (rawUsername.startsWith("http://") || rawUsername.startsWith("https://")) {
-                channelButton.setUrl(rawUsername);
-            } else {
-                channelButton.setUrl("https://t.me/" + rawUsername.replace("@", ""));
+        if (channels != null) {
+            for (ChallengeChannel channel : channels) {
+                List<InlineKeyboardButton> row = new ArrayList<>();
+                InlineKeyboardButton channelButton = new InlineKeyboardButton();
+                channelButton.setText(channel.getChannelName());
+                String rawUsername = channel.getChannelUsername() != null ? channel.getChannelUsername().trim() : "";
+                if (rawUsername.startsWith("http://") || rawUsername.startsWith("https://")) {
+                    channelButton.setUrl(rawUsername);
+                } else {
+                    channelButton.setUrl("https://t.me/" + rawUsername.replace("@", ""));
+                }
+                row.add(channelButton);
+                rows.add(row);
             }
-            row.add(channelButton);
-            rows.add(row);
         }
+
+        // Instagram button
+        List<InlineKeyboardButton> instagramRow = new ArrayList<>();
+        InlineKeyboardButton instagramButton = new InlineKeyboardButton();
+        instagramButton.setText(BUTTON_INSTAGRAM);
+        instagramButton.setUrl(INSTAGRAM_URL);
+        instagramRow.add(instagramButton);
+        rows.add(instagramRow);
+
+        // YouTube button
+        List<InlineKeyboardButton> youtubeRow = new ArrayList<>();
+        InlineKeyboardButton youtubeButton = new InlineKeyboardButton();
+        youtubeButton.setText(BUTTON_YOUTUBE);
+        youtubeButton.setUrl(YOUTUBE_URL);
+        youtubeRow.add(youtubeButton);
+        rows.add(youtubeRow);
 
         List<InlineKeyboardButton> verifyRow = new ArrayList<>();
         InlineKeyboardButton verifyButton = new InlineKeyboardButton();
-        verifyButton.setText("✅ A'zo bo'ldim");
+        verifyButton.setText(BUTTON_I_JOINED);
         verifyButton.setCallbackData(CALLBACK_VERIFY_CHANNELS);
         verifyRow.add(verifyButton);
         rows.add(verifyRow);
@@ -173,6 +191,9 @@ public class ChannelVerificationHandler {
         StringBuilder text = new StringBuilder();
         text.append("Assalomu alaykum\n\n");
         text.append("Botdan to’liq foydalanish uchun quyidagi ").append(channelWord).append(" obuna bo’ling😊\n\n");
+        text.append("Shuningdek, quyidagi tarmoqlarga ham a'zo bo'ling:\n");
+        text.append("📸 Instagram: ").append(INSTAGRAM_URL.replace("_", "\\_")).append("\n");
+        text.append("▶️ YouTube: ").append(YOUTUBE_URL.replace("_", "\\_")).append("\n\n");
         text.append("Keyin \"✅ A'zo bo'ldim\" tugmasini bosing!");
         message.setText(text.toString());
         message.setReplyMarkup(createChallengeChannelSubscriptionKeyboard(channels));

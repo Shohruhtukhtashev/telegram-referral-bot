@@ -98,8 +98,8 @@ public class ReferralHandler {
                 if (activeChannels.isEmpty()) {
                     challengeUserService.markUserAsVerified(challenge.getId(), chatId);
                 } else {
-                    SendMessage channelMessage = messageService.createChannelSubscriptionMessage(chatId,
-                            activeChannels);
+                    SendMessage channelMessage = channelVerificationHandler
+                            .createChallengeChannelSubscriptionMessage(chatId, activeChannels);
                     try {
                         botSupplier.get().execute(channelMessage);
                         return;

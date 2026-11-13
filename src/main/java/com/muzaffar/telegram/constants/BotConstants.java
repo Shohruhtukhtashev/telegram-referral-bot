@@ -114,6 +114,22 @@ public final class BotConstants {
     public static final String BUTTON_I_JOINED = "✅ A'zo bo'ldim";
 
     /**
+     * "Instagram" button text
+     */
+    public static final String BUTTON_INSTAGRAM = "📸 Instagram";
+
+    /**
+     * "YouTube" button text
+     */
+    public static final String BUTTON_YOUTUBE = "▶️ YouTube";
+
+    /**
+     * Social Media Links
+     */
+    public static final String INSTAGRAM_URL = "https://www.instagram.com/muzaffar_saxadinov?mdxt=MWJnaWVvdjRyY3p2Yw%3D%3D&utm_source=qr";
+    public static final String YOUTUBE_URL = "https://www.youtube.com/@muzaffar_saxadinov";
+
+    /**
      * "Menu" button text in Uzbek (Admin)
      */
     public static final String BUTTON_MENU = "📋 Menyu";
