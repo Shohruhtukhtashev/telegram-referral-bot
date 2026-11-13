@@ -326,9 +326,6 @@ public class MessageService {
 
         StringBuilder text = new StringBuilder();
         text.append("Bizning loyihamizda ishtirok etish uchun bizning sahifalarimizga a'zo bo'ling.\n\n");
-        text.append("Shuningdek, quyidagi tarmoqlarga ham a'zo bo'ling:\n");
-        text.append("📸 Instagram: ").append(INSTAGRAM_URL.replace("_", "\\_")).append("\n");
-        text.append("▶️ YouTube: ").append(YOUTUBE_URL.replace("_", "\\_")).append("\n\n");
         text.append("*Keyin \"✅ A'zo bo'ldim\" tugmasini bosing!*\n\n");
 
         message.setText(text.toString());

@@ -191,9 +191,6 @@ public class ChannelVerificationHandler {
         StringBuilder text = new StringBuilder();
         text.append("Assalomu alaykum\n\n");
         text.append("Botdan to’liq foydalanish uchun quyidagi ").append(channelWord).append(" obuna bo’ling😊\n\n");
-        text.append("Shuningdek, quyidagi tarmoqlarga ham a'zo bo'ling:\n");
-        text.append("📸 Instagram: ").append(INSTAGRAM_URL.replace("_", "\\_")).append("\n");
-        text.append("▶️ YouTube: ").append(YOUTUBE_URL.replace("_", "\\_")).append("\n\n");
         text.append("Keyin \"✅ A'zo bo'ldim\" tugmasini bosing!");
         message.setText(text.toString());
         message.setReplyMarkup(createChallengeChannelSubscriptionKeyboard(channels));
